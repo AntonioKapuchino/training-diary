@@ -9,6 +9,18 @@ import './styles.css'
 applyTheme(getStoredTheme())
 ensureSeed()
 
+// Авто-обновление PWA: когда новый service worker берёт управление —
+// перезагружаем страницу, чтобы сразу показать свежую версию.
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing || !hadController) return
+    refreshing = true
+    window.location.reload()
+  })
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HashRouter>
