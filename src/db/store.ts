@@ -136,6 +136,21 @@ export async function exerciseProgress(exerciseId: number): Promise<ProgressPoin
   return points.sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/** Запись по упражнению из предыдущей (более ранней) тренировки — для подсказки «прошлый раз». */
+export async function previousEntryFor(
+  exerciseId: number,
+  beforeDate: string,
+): Promise<{ entry: WorkoutEntry; date: string } | undefined> {
+  const entries = await db.entries.where('exerciseId').equals(exerciseId).toArray()
+  let best: { entry: WorkoutEntry; date: string } | undefined
+  for (const e of entries) {
+    const w = await db.workouts.get(e.workoutId)
+    if (!w) continue
+    if (w.date < beforeDate && (!best || w.date > best.date)) best = { entry: e, date: w.date }
+  }
+  return best
+}
+
 /** Последняя запись по упражнению — чтобы подставлять прошлые подходы. */
 export async function lastEntryFor(exerciseId: number): Promise<WorkoutEntry | undefined> {
   const entries = await db.entries.where('exerciseId').equals(exerciseId).toArray()

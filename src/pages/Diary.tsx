@@ -4,11 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import { getOrCreateWorkout } from '../db/store'
 import { downloadBackup, restoreBackup, type ImportSummary } from '../db/backup'
+import { THEMES, getStoredTheme, setTheme, type Theme } from '../lib/theme'
 import { strengthVolume } from '../lib/exerciseKind'
 import { formatDayYear, relativeLabel, weekdayShort, todayISO, parseISO } from '../lib/date'
 import { GROUP_COLOR } from '../lib/groupColor'
 import { IconPlus, IconChevron, IconCalendar, IconSettings, IconDownload, IconUpload } from '../components/icons'
 import Sheet from '../components/Sheet'
+import Heatmap from '../components/Heatmap'
 
 export default function Diary() {
   const nav = useNavigate()
@@ -17,7 +19,13 @@ export default function Diary() {
   const [dataOpen, setDataOpen] = useState(false)
   const [importInfo, setImportInfo] = useState<ImportSummary | null>(null)
   const [importErr, setImportErr] = useState('')
+  const [theme, setThemeState] = useState<Theme>(getStoredTheme())
   const fileRef = useRef<HTMLInputElement>(null)
+
+  function changeTheme(t: Theme) {
+    setTheme(t)
+    setThemeState(t)
+  }
 
   const workouts = useLiveQuery(() => db.workouts.orderBy('date').reverse().toArray(), [])
   const entries = useLiveQuery(() => db.entries.toArray(), [])
@@ -31,6 +39,16 @@ export default function Diary() {
     }
     return map
   }, [entries])
+
+  const heatData = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const w of workouts ?? []) {
+      const list = byWorkout.get(w.id!) ?? []
+      const vol = list.reduce((s, e) => s + strengthVolume(e.kind, e.sets), 0)
+      map.set(w.date, vol)
+    }
+    return map
+  }, [workouts, byWorkout])
 
   const stats = useMemo(() => {
     const list = workouts ?? []
@@ -87,6 +105,15 @@ export default function Diary() {
           <div className="l">в этом месяце</div>
         </div>
       </div>
+
+      {(workouts?.length ?? 0) > 0 && (
+        <>
+          <div className="section-label">Активность</div>
+          <div className="card">
+            <Heatmap data={heatData} onPick={(d) => nav(`/workout/${d}`)} />
+          </div>
+        </>
+      )}
 
       <div className="section-label">История</div>
 
@@ -159,7 +186,15 @@ export default function Diary() {
         </div>
       </Sheet>
 
-      <Sheet open={dataOpen} onClose={() => setDataOpen(false)} title="Данные и бэкап">
+      <Sheet open={dataOpen} onClose={() => setDataOpen(false)} title="Настройки">
+        <div className="section-label" style={{ margin: '4px 0 8px' }}>Тема оформления</div>
+        <div className="chips-wrap" style={{ marginBottom: 8 }}>
+          {THEMES.map((t) => (
+            <button key={t.value} className={'chip' + (theme === t.value ? ' active' : '')} onClick={() => changeTheme(t.value)}>{t.label}</button>
+          ))}
+        </div>
+
+        <div className="section-label" style={{ margin: '20px 0 8px' }}>Данные и бэкап</div>
         <p className="muted" style={{ marginBottom: 16, lineHeight: 1.5 }}>
           Все тренировки хранятся на этом устройстве. Сохраняй бэкап в файл время от времени —
           так данные не потеряются, и их можно перенести на другой телефон.

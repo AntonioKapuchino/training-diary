@@ -4,15 +4,22 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
 import {
   getOrCreateWorkout, addEntry, updateEntry, deleteEntry,
-  deleteWorkout, setWorkoutNote, saveTemplateFromWorkout, lastEntryFor,
+  deleteWorkout, setWorkoutNote, saveTemplateFromWorkout, lastEntryFor, previousEntryFor,
 } from '../db/store'
 import type { Exercise, SetEntry, WorkoutEntry } from '../db/types'
 import { columnsFor, defaultSet, summaryFor, strengthVolume } from '../lib/exerciseKind'
-import { formatFull } from '../lib/date'
+import { formatFull, formatDay } from '../lib/date'
 import { GROUP_COLOR } from '../lib/groupColor'
-import { IconBack, IconPlus, IconTrash, IconClose, IconNote, IconTemplate } from '../components/icons'
+import { IconBack, IconPlus, IconTrash, IconClose, IconNote, IconTemplate, IconGrip } from '../components/icons'
 import ExercisePicker from '../components/ExercisePicker'
 import Sheet from '../components/Sheet'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy, arrayMove, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 export default function WorkoutEditor() {
   const { date = '' } = useParams()
@@ -58,6 +65,20 @@ export default function WorkoutEditor() {
 
   const totalVol = (entries ?? []).reduce((s, e) => s + strengthVolume(e.kind, e.sets), 0)
 
+  // перетаскивание: начинаем тащить после небольшого смещения, чтобы не мешать тапам/скроллу
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  async function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id || !entries) return
+    const ids = entries.map((x) => x.id!)
+    const from = ids.indexOf(Number(active.id))
+    const to = ids.indexOf(Number(over.id))
+    if (from < 0 || to < 0) return
+    const reordered = arrayMove(entries, from, to)
+    await Promise.all(reordered.map((en, i) => (en.order === i ? null : updateEntry(en.id!, { order: i }))))
+  }
+
   return (
     <div className="screen">
       <div className="row" style={{ paddingTop: 'var(--safe-top)', marginBottom: 6 }}>
@@ -74,9 +95,18 @@ export default function WorkoutEditor() {
         {totalVol > 0 && <div className="screen-sub">Общий объём: {Math.round(totalVol).toLocaleString('ru')} кг</div>}
       </div>
 
-      {(entries ?? []).map((entry) => (
-        <EntryCard key={entry.id} entry={entry} onDelete={() => deleteEntry(entry.id!)} />
-      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={(entries ?? []).map((e) => e.id!)} strategy={verticalListSortingStrategy}>
+          {(entries ?? []).map((entry) => (
+            <EntryCard
+              key={entry.id}
+              entry={entry}
+              workoutDate={date}
+              onDelete={() => deleteEntry(entry.id!)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
 
       {(entries?.length ?? 0) === 0 && (
         <div className="empty">
@@ -118,10 +148,13 @@ export default function WorkoutEditor() {
 
 /* ---------- Карточка одного упражнения ---------- */
 
-function EntryCard({ entry, onDelete }: { entry: WorkoutEntry; onDelete: () => void }) {
+function EntryCard({ entry, workoutDate, onDelete }: { entry: WorkoutEntry; workoutDate: string; onDelete: () => void }) {
   const [sets, setSets] = useState<SetEntry[]>(entry.sets)
   const [comment, setComment] = useState(entry.comment ?? '')
   const [showComment, setShowComment] = useState(!!entry.comment)
+  const [prev, setPrev] = useState<{ date: string; text: string } | null>(null)
+
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: entry.id! })
 
   // Пересеять при смене записи
   useEffect(() => {
@@ -129,6 +162,15 @@ function EntryCard({ entry, onDelete }: { entry: WorkoutEntry; onDelete: () => v
     setComment(entry.comment ?? '')
     setShowComment(!!entry.comment)
   }, [entry.id])
+
+  // Подсказка «прошлый раз»
+  useEffect(() => {
+    let active = true
+    previousEntryFor(entry.exerciseId, workoutDate).then((p) => {
+      if (active) setPrev(p ? { date: p.date, text: summaryFor(p.entry.kind, p.entry.sets) } : null)
+    })
+    return () => { active = false }
+  }, [entry.exerciseId, workoutDate])
 
   function persist(next: SetEntry[]) {
     setSets(next)
@@ -148,10 +190,20 @@ function EntryCard({ entry, onDelete }: { entry: WorkoutEntry; onDelete: () => v
   }
 
   const cols = columnsFor(entry.kind)
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 5 : undefined,
+    position: 'relative' as const,
+  }
 
   return (
-    <div className="card">
-      <div className="row" style={{ marginBottom: 12 }}>
+    <div className="card" ref={setNodeRef} style={style}>
+      <div className="row" style={{ marginBottom: prev ? 8 : 12 }}>
+        <span className="drag-handle" {...attributes} {...listeners} title="Перетащить">
+          <IconGrip style={{ width: 18, height: 18 }} />
+        </span>
         <span className="group-dot" style={{ background: GROUP_COLOR[entry.group], width: 11, height: 11 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 750, fontSize: 17, letterSpacing: '-0.01em' }}>{entry.exerciseName}</div>
@@ -159,6 +211,12 @@ function EntryCard({ entry, onDelete }: { entry: WorkoutEntry; onDelete: () => v
         </div>
         <button className="icon-btn" onClick={onDelete} style={{ color: 'var(--text-3)' }}><IconTrash style={{ width: 18, height: 18 }} /></button>
       </div>
+
+      {prev && (
+        <div className="prev-hint">
+          Прошлый раз ({formatDay(prev.date)}): {prev.text}
+        </div>
+      )}
 
       <div className="set-row">
         <div className="set-label">#</div>

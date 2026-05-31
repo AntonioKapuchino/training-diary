@@ -57,12 +57,12 @@ export default function LineChart({ data, color = '#5b5bd6', unit = '', height =
         <g key={i}>
           <circle cx={p.x} cy={p.y} r={3.5} fill="#fff" stroke={color} strokeWidth={2.5} />
           {(i === 0 || i === geom.pts.length - 1 || p.value === geom.max) && (
-            <text x={p.x} y={p.y - 9} fontSize="11" fontWeight="700" textAnchor="middle" fill="#16161a">
+            <text x={p.x} y={p.y - 9} fontSize="11" fontWeight="700" textAnchor="middle" style={{ fill: 'var(--text)' }}>
               {p.value}{unit}
             </text>
           )}
           {(i === 0 || i === geom.pts.length - 1) && (
-            <text x={p.x} y={H - 8} fontSize="10" textAnchor={i === 0 ? 'start' : 'end'} fill="#a0a0ab">
+            <text x={p.x} y={H - 8} fontSize="10" textAnchor={i === 0 ? 'start' : 'end'} style={{ fill: 'var(--text-3)' }}>
               {p.label}
             </text>
           )}
