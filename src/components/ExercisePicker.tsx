@@ -47,7 +47,6 @@ export default function ExercisePicker({ open, onClose, onPick }: Props) {
         className="field"
         placeholder="Поиск или новое упражнение…"
         value={q}
-        autoFocus
         onChange={(e) => setQ(e.target.value)}
         style={{ marginBottom: 10 }}
       />

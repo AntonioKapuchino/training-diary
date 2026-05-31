@@ -2,6 +2,9 @@ import type { SVGProps } from 'react'
 
 const base = (props: SVGProps<SVGSVGElement>) => ({
   viewBox: '0 0 24 24',
+  // Явные размеры обязательны: iOS Safari схлопывает SVG без width/height во flex-контейнерах.
+  width: 24,
+  height: 24,
   fill: 'none',
   stroke: 'currentColor',
   strokeWidth: 2,
@@ -81,7 +84,7 @@ export const IconSettings = (p: SVGProps<SVGSVGElement>) => (
   </svg>
 )
 export const IconGrip = (p: SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...p}>
+  <svg viewBox="0 0 24 24" width={24} height={24} fill="currentColor" {...p}>
     <circle cx="9" cy="6" r="1.5" /><circle cx="15" cy="6" r="1.5" />
     <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
     <circle cx="9" cy="18" r="1.5" /><circle cx="15" cy="18" r="1.5" />
