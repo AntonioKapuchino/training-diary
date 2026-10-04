@@ -1,91 +1,54 @@
-import Dexie, { type Table } from 'dexie'
-import type { Exercise, Workout, WorkoutEntry, Template, MuscleGroup, ExerciseKind } from './types'
+import { Dexie, type EntityTable } from 'dexie'
+import type { BodyLog, Exercise, MetaRecord, Template, Workout, WorkoutEntry } from '@/domain/types'
+import type { BackupV2 } from './backup-format'
 
-export class DiaryDB extends Dexie {
-  exercises!: Table<Exercise, number>
-  workouts!: Table<Workout, number>
-  entries!: Table<WorkoutEntry, number>
-  templates!: Table<Template, number>
+export type SnapshotReason = 'auto' | 'before-import' | 'before-restore' | 'before-migration'
 
-  constructor() {
-    super('training-diary')
+/** Резервная копия внутри приложения: страхует от ошибок вроде случайного импорта. */
+export interface Snapshot {
+  id: string
+  createdAt: number
+  reason: SnapshotReason
+  workouts: number
+  data: BackupV2
+}
+
+/**
+ * Новая база. Первая версия жила в «training-diary» с числовыми id; её не трогаем,
+ * а переносим данные отсюда (см. legacy.ts) — старая база остаётся как запасная копия.
+ */
+export const DB_NAME = 'training-diary-v3'
+
+export class TrainingDB extends Dexie {
+  exercises!: EntityTable<Exercise, 'id'>
+  workouts!: EntityTable<Workout, 'id'>
+  entries!: EntityTable<WorkoutEntry, 'id'>
+  templates!: EntityTable<Template, 'id'>
+  bodyLogs!: EntityTable<BodyLog, 'id'>
+  snapshots!: EntityTable<Snapshot, 'id'>
+  meta!: EntityTable<MetaRecord, 'key'>
+
+  constructor(name = DB_NAME) {
+    super(name)
     this.version(1).stores({
-      exercises: '++id, name, group, isCustom',
-      workouts: '++id, date, createdAt',
-      entries: '++id, workoutId, exerciseId, order',
-      templates: '++id, name, createdAt',
-    })
-    // v2: добавлен тип учёта (kind) у упражнений
-    this.version(2).stores({
-      exercises: '++id, name, group, kind, isCustom',
-      workouts: '++id, date, createdAt',
-      entries: '++id, workoutId, exerciseId, order',
-      templates: '++id, name, createdAt',
-    }).upgrade(async (tx) => {
-      await tx.table('exercises').toCollection().modify((ex: Exercise) => {
-        if (!ex.kind) ex.kind = KIND_BY_NAME[ex.name] ?? 'strength'
-      })
-      await tx.table('entries').toCollection().modify((e: WorkoutEntry) => {
-        if (!e.kind) e.kind = KIND_BY_NAME[e.exerciseName] ?? 'strength'
-      })
+      exercises: 'id, name, muscle',
+      workouts: 'id, status, date, startedAt, [status+startedAt]',
+      entries: 'id, workoutId, exerciseId, [exerciseId+startedAt]',
+      templates: 'id, order',
+      bodyLogs: 'id, date',
+      snapshots: 'id, createdAt',
+      meta: 'key',
     })
   }
 }
 
-export const db = new DiaryDB()
+export const db = new TrainingDB()
 
-/** Базовый каталог: [название, группа, тип учёта] */
-const SEED: Array<[string, MuscleGroup, ExerciseKind]> = [
-  ['Жим лёжа', 'Грудь', 'strength'],
-  ['Жим гантелей на наклонной', 'Грудь', 'strength'],
-  ['Разводка гантелей', 'Грудь', 'strength'],
-  ['Сведение в кроссовере', 'Грудь', 'strength'],
-  ['Отжимания на брусьях', 'Грудь', 'bodyweight'],
+export async function getMeta<T>(key: string): Promise<T | undefined> {
+  const row = await db.meta.get(key)
+  return row?.value as T | undefined
+}
 
-  ['Подтягивания', 'Спина', 'bodyweight'],
-  ['Вертикальная тяга блока', 'Спина', 'strength'],
-  ['Горизонтальная тяга блока', 'Спина', 'strength'],
-  ['Тяга штанги в наклоне', 'Спина', 'strength'],
-  ['Становая тяга', 'Спина', 'strength'],
-
-  ['Приседания со штангой', 'Ноги', 'strength'],
-  ['Жим ногами', 'Ноги', 'strength'],
-  ['Разгибание ног', 'Ноги', 'strength'],
-  ['Сгибание ног', 'Ноги', 'strength'],
-  ['Выпады', 'Ноги', 'strength'],
-  ['Подъём на носки', 'Ноги', 'strength'],
-
-  ['Жим штанги стоя', 'Плечи', 'strength'],
-  ['Жим гантелей сидя', 'Плечи', 'strength'],
-  ['Махи гантелями в стороны', 'Плечи', 'strength'],
-  ['Подъём гантелей перед собой', 'Плечи', 'strength'],
-
-  ['Штанга на бицепс', 'Бицепс', 'strength'],
-  ['Подъём гантелей на бицепс', 'Бицепс', 'strength'],
-  ['Молотки', 'Бицепс', 'strength'],
-
-  ['Французский жим', 'Трицепс', 'strength'],
-  ['Разгибания рук на блоке', 'Трицепс', 'strength'],
-  ['Отжимания узким хватом', 'Трицепс', 'bodyweight'],
-
-  ['Пресс под градусом', 'Пресс', 'bodyweight'],
-  ['Скручивания', 'Пресс', 'bodyweight'],
-  ['Подъём ног в висе', 'Пресс', 'bodyweight'],
-  ['Планка', 'Пресс', 'timed'],
-
-  ['Беговая дорожка', 'Кардио', 'cardio'],
-  ['Велотренажёр', 'Кардио', 'cardio'],
-  ['Эллипс', 'Кардио', 'cardio'],
-]
-
-const KIND_BY_NAME: Record<string, ExerciseKind> = Object.fromEntries(
-  SEED.map(([name, , kind]) => [name, kind])
-)
-
-export async function ensureSeed() {
-  const count = await db.exercises.count()
-  if (count > 0) return
-  await db.exercises.bulkAdd(
-    SEED.map(([name, group, kind]) => ({ name, group, kind, isCustom: false }))
-  )
+export async function setMeta(key: string, value: unknown): Promise<void> {
+  await db.meta.put({ key, value })
 }

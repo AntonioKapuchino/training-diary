@@ -1,0 +1,880 @@
+{
+  "app": "training-diary",
+  "version": 1,
+  "exportedAt": "2026-10-03T18:00:00.000Z",
+  "exercises": [
+    {
+      "id": 1,
+      "name": "Жим лёжа",
+      "group": "Грудь",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 2,
+      "name": "Жим гантелей на наклонной",
+      "group": "Грудь",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 3,
+      "name": "Разводка гантелей",
+      "group": "Грудь",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 4,
+      "name": "Сведение в кроссовере",
+      "group": "Грудь",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 5,
+      "name": "Отжимания на брусьях",
+      "group": "Грудь",
+      "kind": "bodyweight",
+      "isCustom": false
+    },
+    {
+      "id": 6,
+      "name": "Подтягивания",
+      "group": "Спина",
+      "kind": "bodyweight",
+      "isCustom": false
+    },
+    {
+      "id": 7,
+      "name": "Вертикальная тяга блока",
+      "group": "Спина",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 8,
+      "name": "Горизонтальная тяга блока",
+      "group": "Спина",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 9,
+      "name": "Тяга штанги в наклоне",
+      "group": "Спина",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 10,
+      "name": "Становая тяга",
+      "group": "Спина",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 11,
+      "name": "Приседания со штангой",
+      "group": "Ноги",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 12,
+      "name": "Жим ногами",
+      "group": "Ноги",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 13,
+      "name": "Разгибание ног",
+      "group": "Ноги",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 14,
+      "name": "Сгибание ног",
+      "group": "Ноги",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 15,
+      "name": "Выпады",
+      "group": "Ноги",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 16,
+      "name": "Подъём на носки",
+      "group": "Ноги",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 17,
+      "name": "Жим штанги стоя",
+      "group": "Плечи",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 18,
+      "name": "Жим гантелей сидя",
+      "group": "Плечи",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 19,
+      "name": "Махи гантелями в стороны",
+      "group": "Плечи",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 20,
+      "name": "Подъём гантелей перед собой",
+      "group": "Плечи",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 21,
+      "name": "Штанга на бицепс",
+      "group": "Бицепс",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 22,
+      "name": "Подъём гантелей на бицепс",
+      "group": "Бицепс",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 23,
+      "name": "Молотки",
+      "group": "Бицепс",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 24,
+      "name": "Французский жим",
+      "group": "Трицепс",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 25,
+      "name": "Разгибания рук на блоке",
+      "group": "Трицепс",
+      "kind": "strength",
+      "isCustom": false
+    },
+    {
+      "id": 26,
+      "name": "Отжимания узким хватом",
+      "group": "Трицепс",
+      "kind": "bodyweight",
+      "isCustom": false
+    },
+    {
+      "id": 27,
+      "name": "Пресс под градусом",
+      "group": "Пресс",
+      "kind": "bodyweight",
+      "isCustom": false
+    },
+    {
+      "id": 28,
+      "name": "Скручивания",
+      "group": "Пресс",
+      "kind": "bodyweight",
+      "isCustom": false
+    },
+    {
+      "id": 29,
+      "name": "Подъём ног в висе",
+      "group": "Пресс",
+      "kind": "bodyweight",
+      "isCustom": false
+    },
+    {
+      "id": 30,
+      "name": "Планка",
+      "group": "Пресс",
+      "kind": "timed",
+      "isCustom": false
+    },
+    {
+      "id": 31,
+      "name": "Беговая дорожка",
+      "group": "Кардио",
+      "kind": "cardio",
+      "isCustom": false
+    },
+    {
+      "id": 32,
+      "name": "Велотренажёр",
+      "group": "Кардио",
+      "kind": "cardio",
+      "isCustom": false
+    },
+    {
+      "id": 33,
+      "name": "Эллипс",
+      "group": "Кардио",
+      "kind": "cardio",
+      "isCustom": false
+    },
+    {
+      "id": 34,
+      "name": "Тяга к поясу",
+      "group": "Спина",
+      "kind": "strength",
+      "isCustom": true
+    }
+  ],
+  "workouts": [
+    {
+      "id": 27,
+      "date": "2026-09-21",
+      "createdAt": 1789938000000,
+      "note": "Плечо немного ноет"
+    },
+    {
+      "id": 28,
+      "date": "2026-09-23",
+      "createdAt": 1790110800000
+    },
+    {
+      "id": 29,
+      "date": "2026-09-25",
+      "createdAt": 1790283600000
+    },
+    {
+      "id": 30,
+      "date": "2026-09-28",
+      "createdAt": 1790542800000,
+      "note": "Новый рекорд в жиме!"
+    },
+    {
+      "id": 31,
+      "date": "2026-09-30",
+      "createdAt": 1790715600000,
+      "note": "Выспался, всё шло легко"
+    },
+    {
+      "id": 32,
+      "date": "2026-10-02",
+      "createdAt": 1790888400000
+    }
+  ],
+  "entries": [
+    {
+      "id": 105,
+      "workoutId": 27,
+      "exerciseId": 1,
+      "exerciseName": "Жим лёжа",
+      "group": "Грудь",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 8,
+          "weight": 75
+        },
+        {
+          "reps": 8,
+          "weight": 75
+        },
+        {
+          "reps": 8,
+          "weight": 75
+        },
+        {
+          "reps": 8,
+          "weight": 75
+        }
+      ],
+      "order": 0
+    },
+    {
+      "id": 106,
+      "workoutId": 27,
+      "exerciseId": 6,
+      "exerciseName": "Подтягивания",
+      "group": "Спина",
+      "kind": "bodyweight",
+      "sets": [
+        {
+          "reps": 11,
+          "weight": 0
+        },
+        {
+          "reps": 10,
+          "weight": 0
+        },
+        {
+          "reps": 9,
+          "weight": 0
+        }
+      ],
+      "order": 1
+    },
+    {
+      "id": 107,
+      "workoutId": 27,
+      "exerciseId": 34,
+      "exerciseName": "Тяга к поясу",
+      "group": "Спина",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 10,
+          "weight": 63
+        },
+        {
+          "reps": 10,
+          "weight": 63
+        },
+        {
+          "reps": 10,
+          "weight": 63
+        }
+      ],
+      "order": 2
+    },
+    {
+      "id": 108,
+      "workoutId": 27,
+      "exerciseId": 30,
+      "exerciseName": "Планка",
+      "group": "Пресс",
+      "kind": "timed",
+      "sets": [
+        {
+          "seconds": 125
+        },
+        {
+          "seconds": 110
+        }
+      ],
+      "order": 3
+    },
+    {
+      "id": 109,
+      "workoutId": 28,
+      "exerciseId": 11,
+      "exerciseName": "Приседания со штангой",
+      "group": "Ноги",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 6,
+          "weight": 95
+        },
+        {
+          "reps": 6,
+          "weight": 95
+        },
+        {
+          "reps": 6,
+          "weight": 95
+        },
+        {
+          "reps": 6,
+          "weight": 95
+        }
+      ],
+      "order": 0
+    },
+    {
+      "id": 110,
+      "workoutId": 28,
+      "exerciseId": 17,
+      "exerciseName": "Жим штанги стоя",
+      "group": "Плечи",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 8,
+          "weight": 45
+        },
+        {
+          "reps": 8,
+          "weight": 45
+        }
+      ],
+      "order": 1
+    },
+    {
+      "id": 111,
+      "workoutId": 28,
+      "exerciseId": 21,
+      "exerciseName": "Штанга на бицепс",
+      "group": "Бицепс",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 12,
+          "weight": 25
+        },
+        {
+          "reps": 10,
+          "weight": 27.5
+        }
+      ],
+      "order": 2
+    },
+    {
+      "id": 112,
+      "workoutId": 28,
+      "exerciseId": 31,
+      "exerciseName": "Беговая дорожка",
+      "group": "Кардио",
+      "kind": "cardio",
+      "sets": [
+        {
+          "seconds": 1200,
+          "distance": 4.3
+        }
+      ],
+      "order": 3
+    },
+    {
+      "id": 113,
+      "workoutId": 29,
+      "exerciseId": 1,
+      "exerciseName": "Жим лёжа",
+      "group": "Грудь",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 8,
+          "weight": 77.5
+        },
+        {
+          "reps": 8,
+          "weight": 77.5
+        },
+        {
+          "reps": 8,
+          "weight": 77.5
+        },
+        {
+          "reps": 8,
+          "weight": 77.5
+        }
+      ],
+      "order": 0
+    },
+    {
+      "id": 114,
+      "workoutId": 29,
+      "exerciseId": 6,
+      "exerciseName": "Подтягивания",
+      "group": "Спина",
+      "kind": "bodyweight",
+      "sets": [
+        {
+          "reps": 11,
+          "weight": 0
+        },
+        {
+          "reps": 10,
+          "weight": 0
+        },
+        {
+          "reps": 9,
+          "weight": 0
+        }
+      ],
+      "order": 1
+    },
+    {
+      "id": 115,
+      "workoutId": 29,
+      "exerciseId": 34,
+      "exerciseName": "Тяга к поясу",
+      "group": "Спина",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 10,
+          "weight": 64
+        },
+        {
+          "reps": 10,
+          "weight": 64
+        },
+        {
+          "reps": 10,
+          "weight": 64
+        }
+      ],
+      "order": 2
+    },
+    {
+      "id": 116,
+      "workoutId": 29,
+      "exerciseId": 30,
+      "exerciseName": "Планка",
+      "group": "Пресс",
+      "kind": "timed",
+      "sets": [
+        {
+          "seconds": 130
+        },
+        {
+          "seconds": 115
+        }
+      ],
+      "order": 3
+    },
+    {
+      "id": 117,
+      "workoutId": 30,
+      "exerciseId": 11,
+      "exerciseName": "Приседания со штангой",
+      "group": "Ноги",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 6,
+          "weight": 97.5
+        },
+        {
+          "reps": 6,
+          "weight": 97.5
+        },
+        {
+          "reps": 6,
+          "weight": 97.5
+        },
+        {
+          "reps": 6,
+          "weight": 97.5
+        }
+      ],
+      "order": 0
+    },
+    {
+      "id": 118,
+      "workoutId": 30,
+      "exerciseId": 17,
+      "exerciseName": "Жим штанги стоя",
+      "group": "Плечи",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 8,
+          "weight": 45
+        },
+        {
+          "reps": 8,
+          "weight": 45
+        }
+      ],
+      "order": 1
+    },
+    {
+      "id": 119,
+      "workoutId": 30,
+      "exerciseId": 21,
+      "exerciseName": "Штанга на бицепс",
+      "group": "Бицепс",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 12,
+          "weight": 25
+        },
+        {
+          "reps": 10,
+          "weight": 27.5
+        }
+      ],
+      "order": 2
+    },
+    {
+      "id": 120,
+      "workoutId": 30,
+      "exerciseId": 31,
+      "exerciseName": "Беговая дорожка",
+      "group": "Кардио",
+      "kind": "cardio",
+      "sets": [
+        {
+          "seconds": 1200,
+          "distance": 4.4
+        }
+      ],
+      "order": 3
+    },
+    {
+      "id": 121,
+      "workoutId": 31,
+      "exerciseId": 1,
+      "exerciseName": "Жим лёжа",
+      "group": "Грудь",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 8,
+          "weight": 77.5
+        },
+        {
+          "reps": 8,
+          "weight": 77.5
+        },
+        {
+          "reps": 8,
+          "weight": 77.5
+        },
+        {
+          "reps": 8,
+          "weight": 77.5
+        }
+      ],
+      "order": 0,
+      "comment": "Последний подход со страховкой"
+    },
+    {
+      "id": 122,
+      "workoutId": 31,
+      "exerciseId": 6,
+      "exerciseName": "Подтягивания",
+      "group": "Спина",
+      "kind": "bodyweight",
+      "sets": [
+        {
+          "reps": 11,
+          "weight": 0
+        },
+        {
+          "reps": 10,
+          "weight": 0
+        },
+        {
+          "reps": 9,
+          "weight": 0
+        }
+      ],
+      "order": 1
+    },
+    {
+      "id": 123,
+      "workoutId": 31,
+      "exerciseId": 34,
+      "exerciseName": "Тяга к поясу",
+      "group": "Спина",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 10,
+          "weight": 65
+        },
+        {
+          "reps": 10,
+          "weight": 65
+        },
+        {
+          "reps": 10,
+          "weight": 65
+        }
+      ],
+      "order": 2
+    },
+    {
+      "id": 124,
+      "workoutId": 31,
+      "exerciseId": 30,
+      "exerciseName": "Планка",
+      "group": "Пресс",
+      "kind": "timed",
+      "sets": [
+        {
+          "seconds": 135
+        },
+        {
+          "seconds": 120
+        }
+      ],
+      "order": 3
+    },
+    {
+      "id": 125,
+      "workoutId": 32,
+      "exerciseId": 11,
+      "exerciseName": "Приседания со штангой",
+      "group": "Ноги",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 6,
+          "weight": 97.5
+        },
+        {
+          "reps": 6,
+          "weight": 97.5
+        },
+        {
+          "reps": 6,
+          "weight": 97.5
+        },
+        {
+          "reps": 6,
+          "weight": 97.5
+        }
+      ],
+      "order": 0
+    },
+    {
+      "id": 126,
+      "workoutId": 32,
+      "exerciseId": 17,
+      "exerciseName": "Жим штанги стоя",
+      "group": "Плечи",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 8,
+          "weight": 47.5
+        },
+        {
+          "reps": 8,
+          "weight": 47.5
+        }
+      ],
+      "order": 1
+    },
+    {
+      "id": 127,
+      "workoutId": 32,
+      "exerciseId": 21,
+      "exerciseName": "Штанга на бицепс",
+      "group": "Бицепс",
+      "kind": "strength",
+      "sets": [
+        {
+          "reps": 12,
+          "weight": 25
+        },
+        {
+          "reps": 10,
+          "weight": 27.5
+        }
+      ],
+      "order": 2
+    },
+    {
+      "id": 128,
+      "workoutId": 32,
+      "exerciseId": 31,
+      "exerciseName": "Беговая дорожка",
+      "group": "Кардио",
+      "kind": "cardio",
+      "sets": [
+        {
+          "seconds": 1200,
+          "distance": 4.5
+        }
+      ],
+      "order": 3
+    }
+  ],
+  "templates": [
+    {
+      "id": 1,
+      "name": "День A — верх",
+      "createdAt": 1784592000000,
+      "exercises": [
+        {
+          "exerciseId": 1,
+          "exerciseName": "Жим лёжа",
+          "group": "Грудь",
+          "kind": "strength",
+          "sets": [
+            {
+              "reps": 8,
+              "weight": 60
+            },
+            {
+              "reps": 8,
+              "weight": 60
+            },
+            {
+              "reps": 8,
+              "weight": 60
+            },
+            {
+              "reps": 8,
+              "weight": 60
+            }
+          ]
+        },
+        {
+          "exerciseId": 6,
+          "exerciseName": "Подтягивания",
+          "group": "Спина",
+          "kind": "bodyweight",
+          "sets": [
+            {
+              "reps": 8,
+              "weight": 0
+            },
+            {
+              "reps": 7,
+              "weight": 0
+            },
+            {
+              "reps": 6,
+              "weight": 0
+            }
+          ]
+        },
+        {
+          "exerciseId": 34,
+          "exerciseName": "Тяга к поясу",
+          "group": "Спина",
+          "kind": "strength",
+          "sets": [
+            {
+              "reps": 10,
+              "weight": 50
+            },
+            {
+              "reps": 10,
+              "weight": 50
+            },
+            {
+              "reps": 10,
+              "weight": 50
+            }
+          ]
+        },
+        {
+          "exerciseId": 30,
+          "exerciseName": "Планка",
+          "group": "Пресс",
+          "kind": "timed",
+          "sets": [
+            {
+              "seconds": 60
+            },
+            {
+              "seconds": 45
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
