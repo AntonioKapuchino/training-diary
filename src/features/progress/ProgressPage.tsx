@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChartNoAxesColumn, ChevronRight, Scale, Trophy } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useSessionState } from '@/lib/sessionState'
 import { Link } from 'react-router'
 import { useAllEntries, useBodyLogs, useDoneWorkouts, useExerciseMap } from '@/db/hooks'
 import { workoutRecords } from '@/db/workouts'
@@ -48,8 +49,8 @@ export function ProgressPage() {
   const entries = useAllEntries()
   const exercises = useExerciseMap()
   const bodyLogs = useBodyLogs()
-  const [period, setPeriod] = useState<Period>('3m')
-  const [barMetric, setBarMetric] = useState<BarMetric>('count')
+  const [period, setPeriod] = useSessionState<Period>('progress.period', '3m')
+  const [barMetric, setBarMetric] = useSessionState<BarMetric>('progress.bars', 'count')
 
   const today = todayISO()
   const from = addDays(today, -DAYS[period] + 1)
@@ -80,7 +81,7 @@ export function ProgressPage() {
         ? list.length
         : barMetric === 'volume'
           ? list.reduce((s, w) => s + (w.summary?.volume ?? 0), 0)
-          : list.reduce((s, w) => s + workoutSeconds(w), 0) / 60
+          : list.reduce((s, w) => s + workoutSeconds(w), 0) / 3600
     if (period === '1y') {
       // За год — по месяцам: 52 столбика слишком тонкие.
       return Array.from({ length: 12 }, (_, i) => {
@@ -136,7 +137,9 @@ export function ProgressPage() {
       .sort((a, b) => b.value - a.value)
   }, [periodEntries, exercises])
 
-  if (workouts?.length === 0) {
+  // Пока база не ответила — пустая страница, а не нули и «как в прошлом периоде».
+  if (workouts === undefined) return <Page title="Прогресс">{null}</Page>
+  if (workouts.length === 0) {
     return (
       <Page title="Прогресс">
         <EmptyState
@@ -156,7 +159,8 @@ export function ProgressPage() {
         ? v >= 10_000
           ? `${formatNumber(v / 1000, 1)}т`
           : formatNumber(v, 0)
-        : `${formatNumber(v, 0)}м`
+        : // Часы: «м» на оси читалось как метры, а минуты не помещаются.
+          `${formatNumber(v, v > 0 && v < 10 && !Number.isInteger(v) ? 1 : 0)} ч`
 
   return (
     <Page title="Прогресс">
@@ -207,6 +211,7 @@ export function ProgressPage() {
             <Bars
               bars={bars}
               format={fmtBar}
+              integer={barMetric === 'count'}
               label={`${period === '1y' ? 'По месяцам' : 'По неделям'}: ${barMetric === 'count' ? 'тренировки' : barMetric === 'volume' ? 'объём' : 'время'}`}
             />
           </div>
@@ -222,7 +227,7 @@ export function ProgressPage() {
         </Section>
       )}
 
-      <RecentRecords workouts={workouts ?? []} exercises={exercises} />
+      <RecentRecords workouts={workouts} exercises={exercises} />
 
       <ExerciseTrends entries={periodEntries} workouts={current} exercises={exercises} />
 

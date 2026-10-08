@@ -84,5 +84,5 @@ test('подсказки прошлого раза и рекорд', async ({ pa
   await page.keyboard.press('Enter')
   await page.keyboard.type('8')
   await page.keyboard.press('Enter')
-  await expect(bench.getByLabel('Рекорд')).toBeVisible()
+  await expect(bench.getByRole('button', { name: /рекорд/ })).toBeVisible()
 })

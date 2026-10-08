@@ -106,12 +106,16 @@ export function ExerciseCard({
       )}
 
       <div
-        className={`${SET_GRID} px-3 pb-1 text-caption-2 font-semibold text-label-3 uppercase`}
+        className={`${SET_GRID} px-3 pb-1 text-caption-2 font-semibold text-label-2 uppercase`}
         style={{ ['--cols' as string]: fields.length }}
         aria-hidden
       >
         <span className="text-center">#</span>
-        <span>Прошлый раз</span>
+        {/* На узком iPhone SE «Прошлый раз» не помещается в строку — короче. */}
+        <span className="whitespace-nowrap">
+          <span className="max-[389px]:hidden">Прошлый раз</span>
+          <span className="hidden max-[389px]:inline">Прошлый</span>
+        </span>
         {fields.map((f) => (
           <span key={f.field} className="text-center">
             {f.label}

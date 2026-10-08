@@ -1,3 +1,4 @@
+import { Dexie } from 'dexie'
 import { addSession, countRecords, emptyBests, type Bests } from '@/domain/records'
 import { summarize } from '@/domain/stats'
 import type { Exercise, Workout, WorkoutEntry, WorkoutSummary } from '@/domain/types'
@@ -22,9 +23,11 @@ export function buildSummaries(
   }
   const bests = new Map<string, Bests>()
   const result = new Map<string, WorkoutSummary>()
+  // Одинаковое начало (прошлые тренировки по умолчанию в 18:00) — порядок по id,
+  // как в historyBests: рекорд одной из них не должен зависеть от случая.
   const ordered = [...workouts]
     .filter((w) => w.status === 'done')
-    .sort((a, b) => a.startedAt - b.startedAt)
+    .sort((a, b) => a.startedAt - b.startedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 
   for (const w of ordered) {
     const list = (byWorkout.get(w.id) ?? []).sort((a, b) => a.order - b.order)
@@ -50,9 +53,27 @@ export function buildSummaries(
   return result
 }
 
+/**
+ * Отметка «итоги могут быть устаревшими»: правку записали, а пересчёт ещё не прошёл.
+ * Если приложение закроют в эту секунду, при следующем запуске пересчёт доделается.
+ */
+export const SUMMARIES_DIRTY = 'summariesDirty'
+
+/** Ставит отметку. Вне текущей транзакции — её таблицы могут не включать meta. */
+export function markSummariesDirty(): Promise<void> {
+  return Dexie.ignoreTransaction(async () => {
+    await db.meta.put({ key: SUMMARIES_DIRTY, value: true })
+  })
+}
+
+/** При запуске: досчитать то, что не успело пересчитаться в прошлый раз. */
+export async function repairSummaries(): Promise<void> {
+  if ((await db.meta.get(SUMMARIES_DIRTY))?.value) await recomputeAllSummaries()
+}
+
 /** Пересчитывает и сохраняет итоги всех завершённых тренировок. */
 export async function recomputeAllSummaries(): Promise<void> {
-  await db.transaction('rw', db.workouts, db.entries, db.exercises, async () => {
+  await db.transaction('rw', [db.workouts, db.entries, db.exercises, db.meta], async () => {
     const [workouts, entries, exercises] = await Promise.all([
       db.workouts.toArray(),
       db.entries.toArray(),
@@ -64,5 +85,6 @@ export async function recomputeAllSummaries(): Promise<void> {
       .filter((w) => JSON.stringify(w.summary) !== JSON.stringify(summaries.get(w.id)))
       .map((w) => ({ ...w, summary: summaries.get(w.id) }))
     if (changed.length > 0) await db.workouts.bulkPut(changed)
+    await db.meta.delete(SUMMARIES_DIRTY)
   })
 }

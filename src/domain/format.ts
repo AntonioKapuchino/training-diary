@@ -101,3 +101,22 @@ export function roundTo(n: number, step: number): number {
   const decimals = (String(step).split('.')[1] ?? '').length
   return Number((Math.round(n / step) * step).toFixed(decimals))
 }
+
+/**
+ * Длительность с цифровой клавиатуры iPhone, где нет двоеточия: последние две цифры —
+ * секунды, остальное — минуты, как на микроволновке. «130» — 1:30, «1800» — 18:00,
+ * «45» — 45 секунд. С двоеточием («1:30») — как написано.
+ */
+export function parseDurationInput(raw: string): number | undefined {
+  const t = raw.trim()
+  const colon = /^(\d{1,3}):(\d{1,2})$/.exec(t)
+  if (colon) return Number(colon[1]) * 60 + Number(colon[2])
+  if (!/^\d{1,5}$/.test(t)) return undefined
+  const n = Number(t)
+  return Math.floor(n / 100) * 60 + (n % 100)
+}
+
+/** Первая буква заглавная: «четверг, 8 октября» в начале строки — «Четверг, 8 октября». */
+export function capitalize(s: string): string {
+  return s.charAt(0).toLocaleUpperCase('ru-RU') + s.slice(1)
+}

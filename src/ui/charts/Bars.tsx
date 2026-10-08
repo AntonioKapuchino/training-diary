@@ -18,6 +18,8 @@ interface Props {
   format: (v: number) => string
   height?: number
   label: string
+  /** Значения целые (тренировки) — деления оси тоже. */
+  integer?: boolean
 }
 
 const PAD = { top: 22, right: 36, bottom: 22 }
@@ -31,11 +33,11 @@ function barPath(x: number, y: number, w: number, h: number): string {
 }
 
 /** Столбики по неделям: не толще 24 px, между ними воздух. */
-export function Bars({ bars, format, height = 160, label }: Props) {
+export function Bars({ bars, format, height = 160, label, integer }: Props) {
   const [ref, width] = useMeasure<HTMLDivElement>()
   const [active, setActive] = useState<number | null>(null)
   const max = Math.max(1, ...bars.map((b) => b.value))
-  const ticks = niceTicks(0, max, 2)
+  const ticks = niceTicks(0, max, 2, integer)
   const top = ticks.at(-1) ?? max
   const innerW = Math.max(0, width - PAD.right)
   const innerH = height - PAD.top - PAD.bottom
@@ -50,7 +52,7 @@ export function Bars({ bars, format, height = 160, label }: Props) {
         <svg
           width={width}
           height={height}
-          role="img"
+          role="group"
           aria-label={label}
           className="block touch-pan-y"
         >
@@ -114,6 +116,7 @@ export function Bars({ bars, format, height = 160, label }: Props) {
                   height={height - PAD.bottom}
                   fill="transparent"
                   tabIndex={0}
+                  role="img"
                   aria-label={`${b.title}: ${format(b.value)}`}
                   onPointerDown={() => {
                     setActive(i)

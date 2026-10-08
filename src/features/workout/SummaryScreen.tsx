@@ -13,6 +13,7 @@ import { RECORD_LABEL } from '@/domain/records'
 import { workoutSeconds } from '@/domain/stats'
 import { confetti } from '@/lib/confetti'
 import { haptic } from '@/lib/haptics'
+import { useBusy } from '@/lib/useBusy'
 import { useDebouncedSave } from '@/lib/useDebouncedSave'
 import { Button } from '@/ui/Button'
 import { MuscleDot } from '@/ui/MuscleDot'
@@ -34,6 +35,7 @@ function Summary({ id }: { id: string }) {
   const navigate = useNavigate()
   const celebrated = useRef(false)
   const [saved, setSaved] = useState<'template' | 'updated' | null>(null)
+  const [busy, run] = useBusy()
   const note = useDebouncedSave((v) => void updateWorkout(id, { note: v }))
 
   const recordCount = records?.length ?? 0
@@ -62,6 +64,7 @@ function Summary({ id }: { id: string }) {
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
       role="dialog"
+      aria-modal="true"
       aria-label="Итоги тренировки"
     >
       <div className="mx-auto flex min-h-full max-w-[32rem] flex-col px-5 pt-[calc(var(--safe-top)+2.5rem)] pb-[calc(var(--safe-bottom)+1.5rem)]">
@@ -167,14 +170,18 @@ function Summary({ id }: { id: string }) {
               variant="tinted"
               block
               size="lg"
+              className="min-w-0"
+              disabled={busy}
               onClick={() =>
-                void updateTemplateFromWorkout(template.id, id).then(() => {
+                void run(async () => {
+                  await updateTemplateFromWorkout(template.id, id)
                   setSaved('updated')
                   toast(`Программа «${template.name}» обновлена`)
                 })
               }
             >
-              Обновить программу «{template.name}»
+              {/* Длинное название не должно вылезать за кнопку — сокращается многоточием. */}
+              <span className="min-w-0 truncate">Обновить «{template.name}»</span>
             </Button>
           )}
           {!workout.templateId && saved !== 'template' && (
@@ -182,8 +189,10 @@ function Summary({ id }: { id: string }) {
               variant="tinted"
               block
               size="lg"
+              disabled={busy}
               onClick={() =>
-                void templateFromWorkout(id, workout.title ?? 'Моя программа').then(() => {
+                void run(async () => {
+                  await templateFromWorkout(id, workout.title ?? 'Моя программа')
                   setSaved('template')
                   toast('Сохранено в программы')
                 })

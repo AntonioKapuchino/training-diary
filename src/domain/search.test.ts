@@ -33,4 +33,9 @@ describe('поиск упражнений', () => {
     expect(normalizeText('  Жим   Арнольда! ')).toBe('жим арнольда')
     expect(sameName('Подъём ног в висе', 'подъем  ног в висе')).toBe(true)
   })
+  it('разложенная «ё» и названия из значков', () => {
+    expect(sameName('Подъе\u0308м на носки', 'подъем на носки')).toBe(true)
+    expect(sameName('💪', '🔥')).toBe(false)
+    expect(sameName('💪', ' 💪 ')).toBe(true)
+  })
 })

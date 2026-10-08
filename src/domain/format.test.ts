@@ -11,6 +11,7 @@ import {
   parseDecimal,
   plural,
   roundTo,
+  parseDurationInput,
 } from './format'
 
 /** Intl ставит неразрывные пробелы — в тестах сравниваем с обычными. */
@@ -86,5 +87,13 @@ describe('roundTo', () => {
     expect(roundTo(62.49, 2.5)).toBe(62.5)
     expect(roundTo(0.1 + 0.2, 0.1)).toBe(0.3)
     expect(roundTo(41.3, 1.25)).toBe(41.25)
+  })
+  it('длительность цифрами без двоеточия — как на микроволновке', () => {
+    expect(parseDurationInput('130')).toBe(90)
+    expect(parseDurationInput('1800')).toBe(1080)
+    expect(parseDurationInput('45')).toBe(45)
+    expect(parseDurationInput('1:30')).toBe(90)
+    expect(parseDurationInput('12000')).toBe(7200)
+    expect(parseDurationInput('1,5')).toBeUndefined()
   })
 })

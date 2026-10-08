@@ -40,4 +40,8 @@ describe('nearestIndex', () => {
     expect(nearestIndex([0, 10, 20], 14)).toBe(1)
     expect(nearestIndex([0, 10, 20], 16)).toBe(2)
   })
+  it('целые деления для счётных величин', () => {
+    expect(niceTicks(0, 1, 2, true)).toEqual([0, 1])
+    expect(niceTicks(0, 5, 2, true)).toEqual([0, 3, 6])
+  })
 })

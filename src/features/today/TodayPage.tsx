@@ -16,10 +16,10 @@ import {
   weekDays,
   WEEKDAY_SHORT,
 } from '@/domain/dates'
-import { countLabel, formatClock, plural } from '@/domain/format'
+import { capitalize, countLabel, formatClock, plural } from '@/domain/format'
 import { streakWeeks } from '@/domain/stats'
 import type { Template } from '@/domain/types'
-import { shareOrDownload } from '@/lib/share'
+import { backupSavedMessage, shareOrDownload } from '@/lib/share'
 import { useNow } from '@/lib/useNow'
 import { useSettings } from '@/settings/settings'
 import { ActionSheet } from '@/ui/ActionSheet'
@@ -46,9 +46,7 @@ export function TodayPage() {
   return (
     <Page
       title="Сегодня"
-      subtitle={
-        <span className="first-letter:uppercase">{formatWeekdayDayMonth(today, today)}</span>
-      }
+      subtitle={<span>{capitalize(formatWeekdayDayMonth(today, today))}</span>}
       actions={
         <IconButton label="Настройки" onClick={() => void navigate('/settings')}>
           <Settings2 className="size-5" strokeWidth={2.2} />
@@ -58,13 +56,12 @@ export function TodayPage() {
       <MigrationCard />
       <BackupBanner reminderDays={settings.backupReminderDays} />
 
-      <Section plain>
-        <WeekCard
-          dates={(workouts ?? []).map((w) => w.date)}
-          goal={settings.weeklyGoal}
-          today={today}
-        />
-      </Section>
+      {/* До ответа базы кольцо показало бы «Ещё 3 тренировки» — лучше подождать. */}
+      {workouts !== undefined && (
+        <Section plain>
+          <WeekCard dates={workouts.map((w) => w.date)} goal={settings.weeklyGoal} today={today} />
+        </Section>
+      )}
 
       <Section plain>
         {active ? (
@@ -358,10 +355,10 @@ function BackupBanner({ reminderDays }: { reminderDays: number }) {
 
   async function save() {
     const file = await backupFile()
-    const res = await shareOrDownload(file)
-    if (res !== 'cancelled') {
-      await markExported()
-      toast('Резервная копия сохранена')
+    const result = backupSavedMessage(await shareOrDownload(file))
+    if (result) {
+      if (result.saved) await markExported()
+      toast(result.message)
     }
   }
 

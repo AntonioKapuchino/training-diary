@@ -104,7 +104,7 @@ export function WorkoutEditor({ workout, mode }: Props) {
   }, [entries, exercises, ctx])
 
   const rowOf = useCallback((entryId: string) => rows.find((r) => r.entry.id === entryId), [rows])
-  const target = ui.keypad && rowOf(ui.keypad.entryId) ? ui.keypad : null
+  const target = ui.keypad?.workoutId === workout.id && rowOf(ui.keypad.entryId) ? ui.keypad : null
 
   // Ячейка под клавиатурой должна быть видна.
   useEffect(() => {
@@ -113,12 +113,12 @@ export function WorkoutEditor({ workout, mode }: Props) {
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [target?.setId, target])
 
-  // Закрыть клавиатуру, если её подход удалили.
+  // Закрыть клавиатуру, если её подход удалили. Чужую — другой тренировки — не трогаем.
   useEffect(() => {
-    if (!ui.keypad) return
+    if (ui.keypad?.workoutId !== workout.id) return
     const row = rowOf(ui.keypad.entryId)
     if (entries && !row?.entry.sets.some((s) => s.id === ui.keypad?.setId)) workoutUi.closeKeypad()
-  }, [ui.keypad, rowOf, entries])
+  }, [ui.keypad, rowOf, entries, workout.id])
 
   function commit(row: Row, set: WorkoutSet, field: SetField, value: number | undefined) {
     const patch: SetPatch = { [field]: value }
@@ -129,7 +129,13 @@ export function WorkoutEditor({ workout, mode }: Props) {
   function focusFirstEmpty(row: Row, set: WorkoutSet) {
     const fields = fieldsFor(row.exercise.kind)
     const empty = fields.find((f) => (set[f.field] ?? 0) === 0) ?? fields[0]
-    if (empty) workoutUi.focus({ entryId: row.entry.id, setId: set.id, field: empty.field })
+    if (empty)
+      workoutUi.focus({
+        workoutId: workout.id,
+        entryId: row.entry.id,
+        setId: set.id,
+        field: empty.field,
+      })
   }
 
   async function toggle(row: Row, setId: string, fromKeypad = false): Promise<boolean> {
@@ -227,7 +233,12 @@ export function WorkoutEditor({ workout, mode }: Props) {
     }
     const nextField = fieldsOfTarget[fieldIndex + 1]
     if (nextField) {
-      workoutUi.focus({ entryId: target.entryId, setId: target.setId, field: nextField.field })
+      workoutUi.focus({
+        workoutId: workout.id,
+        entryId: target.entryId,
+        setId: target.setId,
+        field: nextField.field,
+      })
       return
     }
     if (!past && !keypadSet.done) {
@@ -240,7 +251,12 @@ export function WorkoutEditor({ workout, mode }: Props) {
     const nextSet = keypadRow.entry.sets.slice(keypadSetIndex + 1).find((s) => past || !s.done)
     const first = fieldsOfTarget[0]
     if (nextSet && first)
-      workoutUi.focus({ entryId: target.entryId, setId: nextSet.id, field: first.field })
+      workoutUi.focus({
+        workoutId: workout.id,
+        entryId: target.entryId,
+        setId: nextSet.id,
+        field: first.field,
+      })
     else workoutUi.closeKeypad()
   }
 
@@ -351,7 +367,7 @@ export function WorkoutEditor({ workout, mode }: Props) {
             restSec={restFor(row.entry, row.exercise, settings)}
             past={past}
             onCell={(setId, field) => {
-              workoutUi.focus({ entryId: row.entry.id, setId, field })
+              workoutUi.focus({ workoutId: workout.id, entryId: row.entry.id, setId, field })
             }}
             onToggle={(setId) => void toggle(row, setId)}
             onCopyPrevious={(setId) => {

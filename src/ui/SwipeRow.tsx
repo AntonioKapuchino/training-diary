@@ -19,13 +19,19 @@ export function SwipeRow({ children, onDelete, label = 'Удалить', disable
   const x = useMotionValue(0)
   const opacity = useTransform(x, [-REVEAL, -24, 0], [1, 0.6, 0])
   if (disabled) return <>{children}</>
+  // Строка может достаться следующему элементу списка (ключи по номеру) —
+  // она не должна прийти к нему открытой, с красной кнопкой наготове.
+  const remove = () => {
+    x.set(0)
+    onDelete()
+  }
   return (
     <div className="relative overflow-hidden">
       <motion.button
         type="button"
         aria-label={label}
         style={{ opacity }}
-        onClick={onDelete}
+        onClick={remove}
         className="absolute inset-y-0 right-0 flex w-[5.25rem] items-center justify-center bg-danger text-white"
         tabIndex={-1}
       >
@@ -41,7 +47,7 @@ export function SwipeRow({ children, onDelete, label = 'Удалить', disable
         className="relative bg-surface"
         onDragEnd={(_, info) => {
           if (info.offset.x < -170) {
-            onDelete()
+            remove()
             return
           }
           void animate(x, x.get() < -REVEAL / 2 ? -REVEAL : 0, {

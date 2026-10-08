@@ -21,7 +21,14 @@ export async function migrateLegacy(factory?: IDBFactory): Promise<MigrationStat
   const done = await getMeta<MigrationState>(KEY)
   if (done) return done
 
-  const legacy = await readLegacyDatabase(factory)
+  let legacy
+  try {
+    legacy = await readLegacyDatabase(factory)
+  } catch {
+    // Старая база есть, но не прочиталась. Отметку не ставим — попробуем при
+    // следующем запуске, иначе её данные остались бы недоступны навсегда.
+    return { at: Date.now(), found: false }
+  }
   const hasNewData = (await db.workouts.count()) > 0
   if (!legacy || isEmptyLegacy(legacy) || hasNewData) {
     const state: MigrationState = { at: Date.now(), found: false }
@@ -31,18 +38,27 @@ export async function migrateLegacy(factory?: IDBFactory): Promise<MigrationStat
 
   const converted = convertLegacy(legacy, CATALOG)
   const state: MigrationState = { at: Date.now(), found: true, report: converted.report }
-  await db.transaction(
+  // Проверка ещё раз — внутри записи. Две вкладки, открытые разом, читают старую базу
+  // параллельно, но пишут по очереди: вторая увидит отметку первой и ничего не задвоит.
+  return db.transaction(
     'rw',
     [db.exercises, db.workouts, db.entries, db.templates, db.meta],
     async () => {
+      const already = (await db.meta.get(KEY))?.value as MigrationState | undefined
+      if (already) return already
+      if ((await db.workouts.count()) > 0) {
+        const skipped: MigrationState = { at: Date.now(), found: false }
+        await db.meta.put({ key: KEY, value: skipped })
+        return skipped
+      }
       await db.exercises.bulkPut(converted.exercises)
       await db.workouts.bulkAdd(converted.workouts)
       await db.entries.bulkAdd(converted.entries)
       await db.templates.bulkAdd(converted.templates)
       await db.meta.put({ key: KEY, value: state })
+      return state
     },
   )
-  return state
 }
 
 export async function markMigrationSeen(): Promise<void> {

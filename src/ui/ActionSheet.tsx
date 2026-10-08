@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useIsPresent } from 'motion/react'
 import { useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -51,6 +51,8 @@ function ActionSheetBody({
   actions,
   cancelLabel,
 }: Omit<Props, 'open'> & { title: string | undefined; message: string | undefined }) {
+  // Меню, которое уже закрывается, касаний не принимает — без двойных действий.
+  const present = useIsPresent()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -63,7 +65,11 @@ function ActionSheetBody({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex flex-col justify-end"
+      className={clsx(
+        'fixed inset-0 z-[60] flex flex-col justify-end',
+        !present && 'pointer-events-none',
+      )}
+      inert={!present}
       role="dialog"
       aria-modal="true"
       aria-label={title ?? 'Действия'}

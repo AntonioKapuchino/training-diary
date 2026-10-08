@@ -15,8 +15,9 @@ import { db, type Snapshot } from '@/db/db'
 import { useLastExportAt, useMigrationState } from '@/db/hooks'
 import { dateOf, formatAgo, formatDayMonth, formatTime } from '@/domain/dates'
 import { countLabel, formatNumber } from '@/domain/format'
-import { shareOrDownload } from '@/lib/share'
+import { backupSavedMessage, shareOrDownload } from '@/lib/share'
 import { isPersisted, requestPersistence, storageUsage } from '@/lib/storage'
+import { useBusy } from '@/lib/useBusy'
 import { ActionSheet } from '@/ui/ActionSheet'
 import { Button } from '@/ui/Button'
 import { Row, Section } from '@/ui/List'
@@ -40,6 +41,7 @@ export function DataPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [restoreFrom, setRestoreFrom] = useState<Snapshot | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [busyImport, importing] = useBusy()
   const counts = useLiveQuery(async () => ({
     workouts: await db.workouts.where('status').equals('done').count(),
     templates: await db.templates.count(),
@@ -52,10 +54,10 @@ export function DataPage() {
 
   async function exportJson() {
     const file = await backupFile()
-    const res = await shareOrDownload(file)
-    if (res !== 'cancelled') {
-      await markExported()
-      toast('Резервная копия сохранена')
+    const result = backupSavedMessage(await shareOrDownload(file))
+    if (result) {
+      if (result.saved) await markExported()
+      toast(result.message)
     }
   }
 
@@ -72,11 +74,13 @@ export function DataPage() {
     }
   }
 
-  async function confirmImport() {
+  function confirmImport() {
     if (!preview) return
-    await applyImport(preview)
-    setPreview(null)
-    toast(`Загружено: ${countLabel(preview.workouts, 'тренировка', 'тренировки', 'тренировок')}`)
+    void importing(async () => {
+      await applyImport(preview)
+      setPreview(null)
+      toast(`Загружено: ${countLabel(preview.workouts, 'тренировка', 'тренировки', 'тренировок')}`)
+    })
   }
 
   return (
@@ -91,8 +95,12 @@ export function DataPage() {
       >
         <Row
           icon={persisted ? <ShieldCheck /> : <ShieldAlert />}
-          iconBg={persisted ? 'var(--success)' : 'var(--warning)'}
-          title={persisted ? 'Данные защищены' : 'Защита не включена'}
+          iconBg={
+            persisted === null ? 'var(--fill)' : persisted ? 'var(--success)' : 'var(--warning)'
+          }
+          title={
+            persisted === null ? 'Хранилище' : persisted ? 'Данные защищены' : 'Защита не включена'
+          }
           subtitle={[
             counts ? countLabel(counts.workouts, 'тренировка', 'тренировки', 'тренировок') : null,
             usage !== null ? `${formatNumber(usage / 1024 / 1024, 1)} МБ` : null,
@@ -204,7 +212,8 @@ export function DataPage() {
         onClose={() => {
           setPreview(null)
         }}
-        onConfirm={() => void confirmImport()}
+        busy={busyImport}
+        onConfirm={confirmImport}
       />
       <ActionSheet
         open={restoreFrom !== null}
@@ -232,10 +241,12 @@ function ImportSheet({
   preview,
   onClose,
   onConfirm,
+  busy,
 }: {
   preview: ImportPreview | null
   onClose: () => void
   onConfirm: () => void
+  busy: boolean
 }) {
   return (
     <Sheet open={preview !== null} onClose={onClose} title="Загрузить копию?">
@@ -244,7 +255,8 @@ function ImportSheet({
           <div className="rounded-[var(--radius-card)] bg-fill-3 p-4 text-subhead">
             <div className="font-semibold">
               {preview.source === 'legacy' ? 'Копия первой версии дневника' : 'Резервная копия'}
-              {preview.exportedAt && ` от ${formatDayMonth(preview.exportedAt.slice(0, 10))}`}
+              {preview.exportedAt &&
+                ` от ${formatDayMonth(dateOf(Date.parse(preview.exportedAt)))}`}
             </div>
             <ul className="mt-2 space-y-1 text-label-2">
               <li>
@@ -276,7 +288,7 @@ function ImportSheet({
             Все текущие данные заменятся содержимым файла. Перед этим они сохранятся в снимок — их
             можно будет вернуть.
           </p>
-          <Button block size="lg" variant="destructive" onClick={onConfirm}>
+          <Button block size="lg" variant="destructive" disabled={busy} onClick={onConfirm}>
             Заменить данные
           </Button>
           <Button block size="lg" variant="gray" onClick={onClose}>

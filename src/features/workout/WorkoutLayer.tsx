@@ -8,7 +8,7 @@ import { SummaryScreen } from './SummaryScreen'
 import { WorkoutScreen } from './WorkoutScreen'
 
 /** Всё про идущую тренировку поверх вкладок: капсула, полный экран, итоги. */
-export function WorkoutLayer() {
+export function WorkoutLayer({ tabbar }: { tabbar: boolean }) {
   const active = useActiveWorkout()
   const ui = useWorkoutUi()
 
@@ -28,7 +28,7 @@ export function WorkoutLayer() {
     <>
       <RestWatcher />
       <AnimatePresence>
-        {active && !ui.expanded && <MiniBar key="mini" workout={active} />}
+        {active && !ui.expanded && <MiniBar key="mini" workout={active} tabbar={tabbar} />}
       </AnimatePresence>
       <AnimatePresence>
         {active && ui.expanded && <WorkoutScreen key="screen" workout={active} />}

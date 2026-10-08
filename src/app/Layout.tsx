@@ -1,10 +1,11 @@
 import { motion } from 'motion/react'
 import { useEffect } from 'react'
-import { Outlet, ScrollRestoration, useLocation } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 import { useActiveWorkout } from '@/db/hooks'
 import { useWorkoutUi } from '@/features/workout/store'
 import { WorkoutLayer } from '@/features/workout/WorkoutLayer'
 import { toast, Toaster } from '@/ui/Toast'
+import { ScrollMemory } from './ScrollMemory'
 import { TabBar } from './TabBar'
 import { registerServiceWorker, reloadNow } from './serviceWorker'
 
@@ -33,7 +34,7 @@ export function Layout() {
 
   return (
     <>
-      <ScrollRestoration />
+      <ScrollMemory />
       <motion.div
         key={pathname}
         // Вложенный экран въезжает справа, как push в iOS; вкладки — без анимации.
@@ -45,8 +46,8 @@ export function Layout() {
         <Outlet />
       </motion.div>
       {!editing && <TabBar />}
-      <WorkoutLayer />
-      <Toaster offset={bottom} />
+      <WorkoutLayer tabbar={!editing} />
+      <Toaster offset={bottom} top={Boolean(active) && ui.expanded} />
     </>
   )
 }

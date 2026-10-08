@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react'
 import type { SetField } from '@/domain/types'
 
 export interface KeypadTarget {
+  /** Чья клавиатура: экран идущей тренировки и правка прошлой могут быть открыты разом. */
+  workoutId: string
   entryId: string
   setId: string
   field: SetField

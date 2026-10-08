@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Copy, Ellipsis, Play, Plus, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { useActiveWorkout, useExerciseMap, useTemplate } from '@/db/hooks'
 import {
@@ -11,7 +11,7 @@ import {
   updateTemplate,
 } from '@/db/templates'
 import { lastSession } from '@/db/workouts'
-import { formatClock, formatNumber, parseDecimal } from '@/domain/format'
+import { formatClock, formatNumber, parseDecimal, parseDurationInput } from '@/domain/format'
 import { newId } from '@/domain/ids'
 import { SET_TYPE_BADGE, SET_TYPE_LABEL, SET_TYPES } from '@/domain/labels'
 import {
@@ -61,31 +61,16 @@ function Editor({ initial }: { initial: Template | undefined }) {
   const [picker, setPicker] = useState(false)
   const [menu, setMenu] = useState<string | null>(null)
   const [pageMenu, setPageMenu] = useState(false)
-  const creating = useRef(false)
-  const dirty = useRef(false)
+  const { schedule, flush, discard } = useTemplateAutosave(initial?.id, setId)
 
-  // Автосохранение: новая программа создаётся при первом изменении.
-  useEffect(() => {
-    if (!dirty.current) return
-    const timer = setTimeout(() => {
-      if (id) {
-        void updateTemplate(id, { name: name.trim() || 'Без названия', exercises: items })
-      } else if (!creating.current && (name.trim() || items.length > 0)) {
-        creating.current = true
-        void createTemplate(name.trim() || 'Без названия', items).then((newId) => {
-          setId(newId)
-          void navigate(`/templates/${newId}`, { replace: true })
-        })
-      }
-    }, 350)
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [id, name, items, navigate])
+  function rename(next: string) {
+    setName(next)
+    schedule({ name: next })
+  }
 
   function change(next: TemplateExercise[]) {
-    dirty.current = true
     setItems(next)
+    schedule({ items: next })
   }
 
   async function addExercises(ids: string[]) {
@@ -118,6 +103,8 @@ function Editor({ initial }: { initial: Template | undefined }) {
   }
 
   async function remove() {
+    // Несохранённые правки удаляемой программы записывать уже незачем.
+    discard()
     if (!id) {
       void navigate('/templates', { replace: true })
       return
@@ -185,17 +172,7 @@ function Editor({ initial }: { initial: Template | undefined }) {
       }
     >
       <div className="px-4 pt-2">
-        <input
-          value={name}
-          autoFocus={!initial}
-          onChange={(e) => {
-            dirty.current = true
-            setName(e.target.value)
-          }}
-          placeholder="Название программы"
-          aria-label="Название программы"
-          className="w-full bg-transparent text-title-1 font-bold outline-none placeholder:text-label-3"
-        />
+        <TitleInput value={name} autoFocus={!initial} onChange={rename} onDone={flush} />
         {uses !== undefined && uses > 0 && (
           <p className="mt-1 text-footnote text-label-2">Тренировок по программе: {uses}</p>
         )}
@@ -291,6 +268,119 @@ function Editor({ initial }: { initial: Template | undefined }) {
   )
 }
 
+/**
+ * Автосохранение, как в «Заметках»: правки пишутся через 350 мс тишины, а незаписанное —
+ * при уходе со страницы и при сворачивании приложения. Новая программа создаётся при
+ * первой правке; адрес страницы при этом не меняется — иначе страница перерисовалась бы
+ * целиком и клавиатура закрылась бы посреди набора названия.
+ */
+function useTemplateAutosave(initialId: string | undefined, onCreated: (id: string) => void) {
+  const pending = useRef<{ name?: string; items?: TemplateExercise[] }>({})
+  const latest = useRef<{ name: string; items: TemplateExercise[] } | null>(null)
+  const id = useRef(initialId)
+  const creating = useRef<Promise<string> | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const created = useRef(onCreated)
+  useLayoutEffect(() => {
+    created.current = onCreated
+  })
+
+  const flush = useCallback(async () => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = undefined
+    const patch = pending.current
+    if (patch.name === undefined && patch.items === undefined) return
+    pending.current = {}
+    const state = latest.current
+    if (!state) return
+    const title = state.name.trim() || 'Без названия'
+    if (!id.current && creating.current) id.current = await creating.current
+    if (id.current) {
+      await updateTemplate(id.current, { name: title, exercises: state.items })
+      return
+    }
+    if (!state.name.trim() && state.items.length === 0) return
+    creating.current = createTemplate(title, state.items)
+    id.current = await creating.current
+    created.current(id.current)
+  }, [])
+
+  const schedule = useCallback(
+    (patch: { name?: string; items?: TemplateExercise[] }) => {
+      pending.current = { ...pending.current, ...patch }
+      latest.current = {
+        name: patch.name ?? latest.current?.name ?? '',
+        items: patch.items ?? latest.current?.items ?? [],
+      }
+      if (timer.current) clearTimeout(timer.current)
+      timer.current = setTimeout(() => void flush(), 350)
+    },
+    [flush],
+  )
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') void flush()
+    }
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      void flush()
+    }
+  }, [flush])
+
+  const discard = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = undefined
+    pending.current = {}
+  }, [])
+
+  return { schedule, flush, discard }
+}
+
+/** Название программы крупным заголовком: длинное переносится, а не уезжает за край. */
+function TitleInput({
+  value,
+  autoFocus,
+  onChange,
+  onDone,
+}: {
+  value: string
+  autoFocus: boolean
+  onChange: (v: string) => void
+  onDone: () => void
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = '0px'
+    el.style.height = `${String(el.scrollHeight)}px`
+  }, [value])
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      rows={1}
+      autoFocus={autoFocus}
+      enterKeyHint="done"
+      onChange={(e) => {
+        onChange(e.target.value.replace(/\s*\n\s*/g, ' '))
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          e.currentTarget.blur()
+          onDone()
+        }
+      }}
+      placeholder="Название программы"
+      aria-label="Название программы"
+      className="block w-full resize-none overflow-hidden bg-transparent text-title-1 font-bold outline-none placeholder:text-label-3"
+    />
+  )
+}
+
 /** Упражнение программы: подходы с целевыми значениями. */
 function ItemCard({
   item,
@@ -323,7 +413,7 @@ function ItemCard({
         </button>
       </header>
       <div
-        className="grid grid-cols-[2rem_repeat(var(--cols),minmax(0,1fr))_2rem] items-center gap-x-2 px-3 pb-1 text-caption-2 font-semibold text-label-3 uppercase"
+        className="grid grid-cols-[2rem_repeat(var(--cols),minmax(0,1fr))_2rem] items-center gap-x-2 px-3 pb-1 text-caption-2 font-semibold text-label-2 uppercase"
         style={{ ['--cols' as string]: fields.length }}
         aria-hidden
       >
@@ -476,9 +566,11 @@ function TargetInput({
         const raw = e.target.value
         setText(raw)
         if (spec.duration) {
-          const m = /^(\d{1,3})(?::(\d{1,2}))?$/.exec(raw.trim())
           if (!raw.trim()) onChange(undefined)
-          else if (m) onChange(Number(m[1]) * (m[2] !== undefined ? 60 : 1) + Number(m[2] ?? 0))
+          else {
+            const sec = parseDurationInput(raw)
+            if (sec !== undefined) onChange(sec)
+          }
           return
         }
         const v = parseDecimal(raw)

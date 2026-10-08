@@ -73,10 +73,16 @@ export function setMetrics(kind: ExerciseKind, s: WorkoutSet): Partial<Record<Re
   }
 }
 
+/**
+ * Разница меньше этой — равенство. 70 × 10 и 80 × 5 по Эпли дают одно и то же,
+ * но в плавающей точке второе на 1e-14 больше — и без допуска стало бы «рекордом».
+ */
+const EPS = 1e-6
+
 export function isBetter(type: RecordType, value: number, best: number): boolean {
   if (value <= 0) return false
-  if (type === 'pace') return best === 0 || value < best
-  return value > best
+  if (type === 'pace') return best === 0 || value < best - EPS
+  return value > best + EPS
 }
 
 function absorb(b: Bests, m: Partial<Record<RecordType, number>>): void {

@@ -337,3 +337,8 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Под открытой шторкой ручка экрана тренировки не видна — одна ручка, а не две. */
+html[data-sheet] [data-grabber] {
+  opacity: 0;
+}

@@ -1,5 +1,5 @@
 /** «Круглые» деления оси: 0, 25, 50 … а не 0, 23,7, 47,4. */
-export function niceTicks(min: number, max: number, count = 4): number[] {
+export function niceTicks(min: number, max: number, count = 4, integer = false): number[] {
   if (!Number.isFinite(min) || !Number.isFinite(max)) return []
   if (min === max) {
     const pad = Math.abs(min) * 0.1 || 1
@@ -8,7 +8,9 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
   }
   const raw = (max - min) / Math.max(1, count)
   const pow = 10 ** Math.floor(Math.log10(raw))
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow
+  let step = [1, 2, 2.5, 5, 10].map((m) => m * pow).find((s) => s >= raw) ?? 10 * pow
+  // Счётные величины (тренировки за неделю) — только целые деления: иначе «0, 1, 1».
+  if (integer) step = Math.max(1, Math.ceil(step))
   const start = Math.floor(min / step) * step
   const end = Math.ceil(max / step) * step
   const ticks: number[] = []

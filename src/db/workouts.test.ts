@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   applyImport,
+  backupDue,
   collectBackup,
+  csvFile,
   createSnapshot,
   previewImport,
   restoreSnapshot,
@@ -9,12 +11,14 @@ import {
 import { db } from './db'
 import { createExercise, deleteExercise, mergeExercises, NameTakenError } from './exercises'
 import { ensureCatalog } from './seed'
+import { repairSummaries, SUMMARIES_DIRTY } from './summaries'
 import { createTemplate, templateFromWorkout, updateTemplateFromWorkout } from './templates'
 import {
   addExercises,
   addSet,
   createPastWorkout,
   deleteWorkout,
+  finishTime,
   finishWorkout,
   flushRecompute,
   getActiveWorkout,
@@ -100,6 +104,30 @@ describe('тренировка', () => {
     expect(await toggleSetDone(entry.id, set.id, 'strength')).toBe('undone')
   })
 
+  it('набранный ноль — значение: подсказка его не перекрывает', async () => {
+    const id = await startWorkout()
+    await addExercises(id, [PULLUPS])
+    const [entry] = await entriesOf(id)
+    const set = entry?.sets[0]
+    if (!entry || !set) throw new Error('no set')
+    // В прошлый раз подтягивался с +10 кг, сегодня без отягощения.
+    await updateSet(entry.id, set.id, { weight: 0 })
+    expect(await toggleSetDone(entry.id, set.id, 'bodyweight', { weight: 10, reps: 8 })).toBe(
+      'done',
+    )
+    expect((await db.entries.get(entry.id))?.sets[0]).toMatchObject({ weight: 0, reps: 8 })
+  })
+
+  it('забытая тренировка заканчивается последним подходом, а не утром', () => {
+    const start = Date.parse('2026-10-07T19:00:00+03:00')
+    const lastSet = start + 50 * 60_000
+    const morning = Date.parse('2026-10-08T09:00:00+03:00')
+    const w = { startedAt: start, updatedAt: lastSet }
+    const entries = [{ sets: [{ id: 's', type: 'normal' as const, done: true, doneAt: lastSet }] }]
+    expect(finishTime(w, entries, morning)).toBe(lastSet + 60_000)
+    expect(finishTime(w, entries, lastSet + 10 * 60_000)).toBe(lastSet + 10 * 60_000)
+  })
+
   it('завершение выбрасывает пустые подходы и упражнения, заполненные — по выбору', async () => {
     const id = await startWorkout()
     await addExercises(id, [BENCH, PULLUPS])
@@ -128,6 +156,46 @@ describe('тренировка', () => {
     expect(records).toHaveLength(1)
     expect(records[0]?.types).toEqual(['e1rm', 'weight', 'setVolume'])
     expect((await db.workouts.get(second))?.summary?.records).toBe(3)
+  })
+
+  it('равный по формуле максимум — не рекорд (70 × 10 и 80 × 5)', async () => {
+    await benchWorkout([[70, 10]])
+    const second = await benchWorkout([[80, 5]])
+    const records = await workoutRecords(second)
+    expect(records[0]?.types).toEqual(['weight'])
+  })
+
+  it('рекорды тренировок с одинаковым началом сходятся в итогах и в карточке', async () => {
+    // Обе внесены задним числом на один день — по умолчанию в 18:00.
+    const a = await createPastWorkout('2026-09-01')
+    const b = await createPastWorkout('2026-09-01')
+    for (const [id, weight] of [
+      [a, 60],
+      [b, 70],
+    ] as const) {
+      await addExercises(id, [BENCH])
+      const [e] = await entriesOf(id)
+      const set = e?.sets[0]
+      if (!e || !set) throw new Error('no set')
+      await updateSet(e.id, set.id, { weight, reps: 5, done: true })
+    }
+    await flushRecompute()
+    for (const id of [a, b]) {
+      const summary = (await db.workouts.get(id))?.summary?.records ?? 0
+      const shown = (await workoutRecords(id)).flatMap((r) => r.types).length
+      expect(shown).toBe(summary)
+    }
+  })
+
+  it('итоги, не успевшие пересчитаться, досчитываются при запуске', async () => {
+    const id = await benchWorkout([[60, 8]])
+    await db.workouts.update(id, {
+      summary: { exercises: 0, sets: 0, volume: 0, reps: 0, muscles: [], records: 0 },
+    })
+    await db.meta.put({ key: SUMMARIES_DIRTY, value: true })
+    await repairSummaries()
+    expect((await db.workouts.get(id))?.summary).toMatchObject({ sets: 1, volume: 480 })
+    expect(await db.meta.get(SUMMARIES_DIRTY)).toBeUndefined()
   })
 
   it('быстрые правки одного упражнения не затирают друг друга', async () => {
@@ -296,6 +364,59 @@ describe('резервная копия', () => {
   it('понятная ошибка на чужой файл', () => {
     expect(() => previewImport('not json')).toThrow(/JSON/)
     expect(() => previewImport('{"hello": 1}')).toThrow(/не похож/)
+    expect(() => previewImport('{"app": "training-diary", "format": 3}')).toThrow(/новая версия/)
+  })
+
+  it('дата копии: битая не роняет предпросмотр, отсутствующая не выдаётся за сегодня', async () => {
+    const backup = await collectBackup()
+    expect(
+      previewImport(JSON.stringify({ ...backup, exportedAt: 'вчера' })).exportedAt,
+    ).toBeUndefined()
+    const { exportedAt: _drop, ...rest } = backup
+    expect(previewImport(JSON.stringify(rest)).exportedAt).toBeUndefined()
+    expect(previewImport(JSON.stringify(backup)).exportedAt).toBe(backup.exportedAt)
+  })
+
+  it('повторы id в файле не затирают записи и не склеивают подходы', async () => {
+    const id = await benchWorkout([
+      [60, 8],
+      [60, 8],
+    ])
+    const backup = await collectBackup()
+    const entry = backup.entries.find((e) => e.workoutId === id)
+    if (!entry) throw new Error('no entry')
+    const sets = entry.sets.map((s) => ({ ...s, id: 'один' }))
+    const broken = {
+      ...backup,
+      entries: [
+        ...backup.entries.filter((e) => e !== entry),
+        { ...entry, sets },
+        { ...entry, sets },
+      ],
+    }
+    const preview = previewImport(JSON.stringify(broken))
+    const imported = preview.data.entries.filter((e) => e.workoutId === id)
+    expect(imported).toHaveLength(1)
+    expect(new Set(imported[0]?.sets.map((s) => s.id)).size).toBe(2)
+    expect(preview.dropped).toBe(1)
+  })
+
+  it('напоминание о копии замечает внесённую задним числом тренировку', async () => {
+    for (let i = 0; i < 3; i++) await benchWorkout([[60, 8]])
+    // Тренировки месячной давности, копия — 20 дней назад: с тех пор ничего не менялось.
+    await db.workouts.toCollection().modify({ updatedAt: Date.now() - 30 * 86_400_000 })
+    await db.meta.put({ key: 'lastExportAt', value: Date.now() - 20 * 86_400_000 })
+    expect((await backupDue(14)).due).toBe(false)
+    await createPastWorkout('2026-01-10')
+    expect((await backupDue(14)).due).toBe(true)
+  })
+
+  it('CSV: заметка, похожая на формулу, не исполняется в Excel', async () => {
+    const id = await benchWorkout([[60, 8]])
+    const [entry] = await entriesOf(id)
+    await db.entries.update(entry?.id ?? '', { note: '+2,5 кг в след. раз' })
+    const text = await (await csvFile()).text()
+    expect(text).toContain("'+2,5 кг в след. раз")
   })
 
   it('битые записи отбрасываются, а не ломают импорт', async () => {

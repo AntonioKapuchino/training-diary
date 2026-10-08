@@ -33,6 +33,7 @@ export function MuscleDots({
   return (
     <span
       className="inline-flex items-center gap-1"
+      role="img"
       aria-label={muscles.map((m) => MUSCLE_LABEL[m]).join(', ')}
     >
       {muscles.slice(0, max).map((m) => (

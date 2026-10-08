@@ -61,6 +61,25 @@ describe('недели', () => {
     expect(streakWeeks([...dates, '2026-10-01'], 2, '2026-10-01')).toBe(3)
     expect(streakWeeks(dates, 2, '2026-10-08')).toBe(0)
   })
+  it('темп кардио — только по подходам с временем и дистанцией', () => {
+    const p = sessionPoint('cardio', 'w', 0, [
+      { id: 'a', type: 'normal', seconds: 1800, distance: 5, done: true },
+      { id: 'b', type: 'normal', seconds: 600, done: true },
+    ])
+    expect(p?.pace).toBe(360)
+    expect(p?.totalDuration).toBe(2400)
+  })
+  it('серия считает тренировки, как кольцо недели: две в один день — две', () => {
+    const dates = [
+      '2026-09-21',
+      '2026-09-21',
+      '2026-09-23',
+      '2026-09-28',
+      '2026-09-28',
+      '2026-09-30',
+    ]
+    expect(streakWeeks(dates, 3, '2026-10-01')).toBe(2)
+  })
   it('длительность старых тренировок неизвестна', () => {
     expect(workoutSeconds({ startedAt: 1000, finishedAt: 1000 })).toBe(0)
     expect(workoutSeconds({ startedAt: 0, finishedAt: 2_700_000 })).toBe(2700)

@@ -6,11 +6,12 @@ import { useActiveWorkout, useEntries, useExerciseMap, useWorkout } from '@/db/h
 import { templateFromWorkout } from '@/db/templates'
 import { deleteWorkout, restoreWorkout, workoutRecords } from '@/db/workouts'
 import { formatDayMonth, formatTime, formatWeekdayDayMonth, todayISO } from '@/domain/dates'
-import { formatDuration, formatVolume, volumeParts } from '@/domain/format'
+import { capitalize, formatDuration, formatVolume, volumeParts } from '@/domain/format'
 import { SET_TYPE_BADGE } from '@/domain/labels'
 import { isWorking } from '@/domain/sets'
 import { workoutSeconds } from '@/domain/stats'
 import type { Exercise, Workout, WorkoutEntry } from '@/domain/types'
+import { useBusy } from '@/lib/useBusy'
 import { ActionSheet } from '@/ui/ActionSheet'
 import { Row, Section } from '@/ui/List'
 import { MuscleDot } from '@/ui/MuscleDot'
@@ -31,6 +32,7 @@ export function WorkoutDetailPage() {
   const records = useLiveQuery(() => (id ? workoutRecords(id) : []), [id, workout?.updatedAt])
   const navigate = useNavigate()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [saving, runSave] = useBusy()
   const isActive = workout?.status === 'active'
 
   // Идущая тренировка открывается на своём экране, а не в истории.
@@ -85,9 +87,7 @@ export function WorkoutDetailPage() {
       <div className="px-5 pt-2">
         <h1 className="text-title-1 font-bold">{title}</h1>
         <p className="mt-1 text-subhead text-label-2">
-          <span className="first-letter:uppercase">
-            {formatWeekdayDayMonth(workout.date, todayISO())}
-          </span>
+          {capitalize(formatWeekdayDayMonth(workout.date, todayISO()))}
           {seconds > 0 && ` · ${formatTime(workout.startedAt)}`}
           {rating && ` · ${rating.emoji} ${rating.label.toLowerCase()}`}
         </p>
@@ -135,8 +135,10 @@ export function WorkoutDetailPage() {
           icon={<BookmarkPlus />}
           iconBg="var(--m-back)"
           title="Сохранить как программу"
+          disabled={saving}
           onClick={() =>
-            void templateFromWorkout(workout.id, title).then(() => {
+            void runSave(async () => {
+              await templateFromWorkout(workout.id, title)
               toast('Сохранено в программы')
             })
           }
@@ -173,10 +175,13 @@ export function WorkoutDetailPage() {
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  // «1 ч 25 мин» в узкую плитку не влезает: переносится по «1 ч / 25 мин», а не обрезается.
   return (
     <div className="rounded-[var(--radius-cell)] bg-surface px-2 py-2.5 text-center">
-      <div className={`truncate font-rounded text-body font-bold ${accent ? 'text-warning' : ''}`}>
-        {value}
+      <div
+        className={`font-rounded text-body leading-tight font-bold text-balance ${accent ? 'text-warning' : ''}`}
+      >
+        {value.replace(/ (мин|сек|кг|т)$/u, '\u00a0$1')}
       </div>
       <div className="mt-0.5 text-caption-2 text-label-2">{label}</div>
     </div>

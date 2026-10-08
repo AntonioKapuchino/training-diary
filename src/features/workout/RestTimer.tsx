@@ -48,9 +48,10 @@ export function RestPill() {
       animate={{ y: 0, opacity: 1, scale: 1 }}
       exit={{ y: 40, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 500, damping: 36 }}
+      // glass задаёт background целиком и перекрыл бы зелёный: либо одно, либо другое.
       className={clsx(
-        'relative flex h-14 items-center gap-2 overflow-hidden rounded-full pr-2 pl-4 glass',
-        finished && 'bg-success text-white',
+        'relative flex h-14 items-center gap-2 overflow-hidden rounded-full pr-2 pl-4',
+        finished ? 'bg-success text-white' : 'glass',
       )}
       role="timer"
       aria-live="off"

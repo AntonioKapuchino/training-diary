@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
+/** Перед перезагрузкой (обновление версии) — дописать всё незаписанное. */
+export const FLUSH_EVENT = 'td:flush-saves'
+
 /**
  * Сохранение текста с задержкой. Незаписанное сохраняется и при уходе с экрана,
  * и при сворачивании приложения — заметка не теряется, даже если фокус не ушёл с поля.
@@ -27,9 +30,11 @@ export function useDebouncedSave(save: (value: string) => void, delay = 600) {
     }
     document.addEventListener('visibilitychange', onHide)
     window.addEventListener('pagehide', flush)
+    window.addEventListener(FLUSH_EVENT, flush)
     return () => {
       document.removeEventListener('visibilitychange', onHide)
       window.removeEventListener('pagehide', flush)
+      window.removeEventListener(FLUSH_EVENT, flush)
       flush()
     }
   }, [flush])

@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/react'
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { AnimatePresence, motion, useDragControls, useIsPresent, type PanInfo } from 'motion/react'
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useKeyboardInset } from './useKeyboardInset'
 
@@ -23,14 +23,24 @@ interface Props {
 const SPRING = { type: 'spring', stiffness: 420, damping: 40, mass: 0.9 } as const
 
 let openSheets = 0
+/** Открытые шторки по порядку: Escape закрывает только верхнюю. */
+const stack: symbol[] = []
 
 /** Блокировка прокрутки страницы, пока открыта хотя бы одна шторка. */
 function lockScroll(): () => void {
   openSheets++
-  if (openSheets === 1) document.documentElement.style.overflow = 'hidden'
+  // data-sheet — для стилей того, что под шторкой: ручка экрана тренировки прячется,
+  // иначе над шторкой выбора упражнений торчали бы две ручки.
+  if (openSheets === 1) {
+    document.documentElement.style.overflow = 'hidden'
+    document.documentElement.dataset.sheet = 'open'
+  }
   return () => {
     openSheets--
-    if (openSheets === 0) document.documentElement.style.overflow = ''
+    if (openSheets === 0) {
+      document.documentElement.style.overflow = ''
+      delete document.documentElement.dataset.sheet
+    }
   }
 }
 
@@ -60,21 +70,37 @@ function SheetBody({
   const panel = useRef<HTMLDivElement>(null)
   const drag = useDragControls()
   const keyboard = useKeyboardInset()
+  // Закрывающаяся шторка ещё видна, но касаний уже не принимает: второе быстрое
+  // нажатие «Добавить» иначе добавило бы упражнения дважды.
+  const present = useIsPresent()
+  // onClose приходит новой функцией на каждой отрисовке родителя (экран тренировки
+  // обновляется раз в секунду). Эффект ниже не должен из-за этого перезапускаться:
+  // иначе он раз в секунду забирал бы фокус у поля ввода и прятал клавиатуру.
+  const closeRef = useRef(onClose)
+  useLayoutEffect(() => {
+    closeRef.current = onClose
+  })
 
   useEffect(() => {
     const unlock = lockScroll()
+    const me = Symbol('sheet')
+    stack.push(me)
     const prev = document.activeElement as HTMLElement | null
-    panel.current?.focus({ preventScroll: true })
+    // Поле с autoFocus уже в фокусе — не перебиваем его, иначе клавиатура не появится.
+    if (!panel.current?.contains(document.activeElement)) {
+      panel.current?.focus({ preventScroll: true })
+    }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && stack.at(-1) === me) closeRef.current()
     }
     document.addEventListener('keydown', onKey)
     return () => {
       document.removeEventListener('keydown', onKey)
+      stack.splice(stack.indexOf(me), 1)
       unlock()
       prev?.focus({ preventScroll: true })
     }
-  }, [onClose])
+  }, [])
 
   function onDragEnd(_: unknown, info: PanInfo) {
     if (info.offset.y > 120 || info.velocity.y > 700) onClose()
@@ -85,7 +111,11 @@ function SheetBody({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end"
+      className={clsx(
+        'fixed inset-0 z-50 flex flex-col justify-end',
+        !present && 'pointer-events-none',
+      )}
+      inert={!present}
       style={{ paddingBottom: keyboard }}
     >
       <motion.div
@@ -114,11 +144,18 @@ function SheetBody({
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
         transition={SPRING}
+        // Клавиатура поднимает шторку на свою высоту — на столько же шторка и ниже,
+        // иначе её верх (заголовок, поле поиска) уехал бы за экран.
+        style={
+          full
+            ? { height: `calc(100dvh - var(--safe-top) - 0.75rem - ${keyboard}px)` }
+            : { maxHeight: `calc(100dvh - var(--safe-top) - 1.5rem - ${keyboard}px)` }
+        }
         className={clsx(
           'relative mx-auto flex w-full max-w-[32rem] flex-col overflow-hidden bg-surface outline-none',
           full
-            ? 'h-[calc(100dvh-var(--safe-top)-0.75rem)] rounded-t-[var(--radius-sheet)]'
-            : 'mb-[max(0.5rem,var(--safe-bottom))] max-h-[calc(100dvh-var(--safe-top)-1.5rem)] w-[calc(100%-1rem)] rounded-[var(--radius-sheet)]',
+            ? 'rounded-t-[var(--radius-sheet)]'
+            : 'mb-[max(0.5rem,var(--safe-bottom))] w-[calc(100%-1rem)] rounded-[var(--radius-sheet)]',
           'shadow-[0_-4px_40px_rgb(0_0_0/0.18)]',
           className,
         )}

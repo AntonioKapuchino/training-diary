@@ -208,6 +208,12 @@ describe('convertLegacy', () => {
     expect(second?.summary?.records).toBe(3)
   })
 
+  it('файл первой версии без упражнений и шаблонов тоже читается', () => {
+    const { workouts, entries } = sample()
+    const partial = { workouts, entries } as unknown as LegacyData
+    expect(() => convertLegacy(partial, CATALOG)).not.toThrow()
+  })
+
   it('распознаёт файл бэкапа первой версии', () => {
     expect(isLegacyBackup({ app: 'training-diary', version: 1, ...sample() })).toBe(true)
     expect(isLegacyBackup({ app: 'training-diary', format: 2, workouts: [], entries: [] })).toBe(
@@ -288,6 +294,19 @@ describe('migrateLegacy', () => {
     const legacy = await readLegacyDatabase()
     expect(legacy?.workouts).toHaveLength(6)
     expect(legacy?.entries).toHaveLength(7)
+  })
+
+  it('две вкладки разом переносят данные один раз', async () => {
+    await createLegacyDb(sample())
+    const [a, b] = await Promise.all([migrateLegacy(), migrateLegacy()])
+    expect(a.found || b.found).toBe(true)
+    expect(await db.workouts.count()).toBe(4)
+  })
+
+  it('каталог дополняется без ошибок, даже если запусков два разом', async () => {
+    await db.exercises.clear()
+    await Promise.all([ensureCatalog(), ensureCatalog()])
+    expect(await db.exercises.count()).toBeGreaterThan(50)
   })
 
   it('не дублирует, если в новой базе уже есть тренировки', async () => {

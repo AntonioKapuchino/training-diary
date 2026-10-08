@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { CalendarDays, ChartNoAxesColumn, Dumbbell, House } from 'lucide-react'
 import { motion } from 'motion/react'
-import { NavLink, useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 const TABS = [
   {
@@ -42,7 +42,9 @@ export function TabBar() {
         {TABS.map(({ to, label, Icon, match }) => {
           const active = match(pathname)
           return (
-            <NavLink
+            // Link, а не NavLink: NavLink сам решает про aria-current и снимает его,
+            // когда «Сегодня» подсвечена на программах и настройках.
+            <Link
               key={to}
               to={to}
               aria-current={active ? 'page' : undefined}
@@ -67,7 +69,7 @@ export function TabBar() {
               )}
               <Icon className="relative size-6" strokeWidth={active ? 2.3 : 1.9} aria-hidden />
               <span className="relative">{label}</span>
-            </NavLink>
+            </Link>
           )
         })}
       </div>

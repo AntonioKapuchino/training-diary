@@ -66,7 +66,7 @@ export function SetRow({
         <button
           type="button"
           onClick={onTypeMenu}
-          aria-label={`Подход ${badge}, ${SET_TYPE_LABEL[set.type]}. Изменить тип`}
+          aria-label={`Подход ${badge}, ${SET_TYPE_LABEL[set.type]}${record ? ', рекорд' : ''}. Изменить тип`}
           className={clsx(
             'relative flex h-8 w-8 press-scale items-center justify-center rounded-[0.625rem] font-rounded text-subhead font-semibold tabular',
             set.type === 'warmup' &&
@@ -86,7 +86,7 @@ export function SetRow({
                 transition={{ type: 'spring', stiffness: 600, damping: 18 }}
                 className="absolute -top-1.5 -right-1.5 flex size-4 items-center justify-center rounded-full bg-warning text-white"
                 title={record.map((r) => RECORD_LABEL[r]).join(', ')}
-                aria-label="Рекорд"
+                aria-hidden
               >
                 <Trophy className="size-2.5" strokeWidth={3} />
               </motion.span>

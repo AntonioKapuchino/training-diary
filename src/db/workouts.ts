@@ -19,7 +19,7 @@ import type {
   WorkoutSet,
 } from '@/domain/types'
 import { db } from './db'
-import { recomputeAllSummaries } from './summaries'
+import { markSummariesDirty, recomputeAllSummaries, SUMMARIES_DIRTY } from './summaries'
 
 export async function getActiveWorkout(): Promise<Workout | undefined> {
   return db.workouts.where('status').equals('active').first()
@@ -62,19 +62,27 @@ export async function lastSession(
 }
 
 /**
- * Лучшие значения по упражнению до момента `before` — основа для отметок рекордов.
+ * Лучшие значения по упражнению до тренировки `workoutId`, начатой в `before`, —
+ * основа для отметок рекордов. Тренировки с одинаковым началом упорядочены по id,
+ * как в {@link buildSummaries}: иначе рекорд засчитался бы в одном месте и пропал в другом.
  */
 export async function historyBests(
   exerciseId: string,
   kind: ExerciseKind,
   before = Number.POSITIVE_INFINITY,
-  excludeWorkoutId?: string,
+  workoutId?: string,
 ): Promise<Bests> {
-  const entries = await db.entries
-    .where('[exerciseId+startedAt]')
-    .between([exerciseId, Dexie.minKey], [exerciseId, before], true, false)
-    .toArray()
-  const ids = [...new Set(entries.map((e) => e.workoutId))].filter((id) => id !== excludeWorkoutId)
+  const entries = (
+    await db.entries
+      .where('[exerciseId+startedAt]')
+      .between([exerciseId, Dexie.minKey], [exerciseId, before], true, true)
+      .toArray()
+  ).filter(
+    (e) =>
+      e.workoutId !== workoutId &&
+      (e.startedAt < before || (workoutId !== undefined && e.workoutId < workoutId)),
+  )
+  const ids = [...new Set(entries.map((e) => e.workoutId))]
   const workouts = await db.workouts.bulkGet(ids)
   const done = new Set(workouts.filter((w) => w?.status === 'done').map((w) => w?.id))
   let bests = emptyBests()
@@ -227,6 +235,7 @@ async function touch(workoutId: string): Promise<void> {
 let recomputeTimer: ReturnType<typeof setTimeout> | undefined
 /** Правки завершённых тренировок меняют рекорды следующих — пересчёт с задержкой, пачкой. */
 function scheduleRecompute(): void {
+  void markSummariesDirty().catch(() => undefined)
   if (recomputeTimer) clearTimeout(recomputeTimer)
   recomputeTimer = setTimeout(() => {
     recomputeTimer = undefined
@@ -301,25 +310,15 @@ export async function toggleSetDone(
         delete next.doneAt
         return next
       }
-      const filled: WorkoutSet = { ...(hint ? pickValues(hint) : {}), ...dropEmpty(s) }
+      // Подсказка заполняет только пустые ячейки. Набранный ноль — значение:
+      // подтягивания без отягощения после +10 кг в прошлый раз остаются без него.
+      const filled: WorkoutSet = { ...(hint ? pickValues(hint) : {}), ...compact(s) }
       if (!isComplete(kind, filled)) return s
       result = 'done'
       return { ...filled, done: true, doneAt: Date.now() }
     })
   })
   return result
-}
-
-/** Пустые значения не перекрывают подсказку. */
-function dropEmpty(s: WorkoutSet): WorkoutSet {
-  const positive = (n: number | undefined) => (n !== undefined && n > 0 ? n : undefined)
-  return compact({
-    ...s,
-    weight: positive(s.weight),
-    reps: positive(s.reps),
-    seconds: positive(s.seconds),
-    distance: positive(s.distance),
-  })
 }
 
 /** Убирает поля со значением undefined: в базе их нет, а не «есть, но пустые». */
@@ -520,11 +519,14 @@ export async function finishWorkout(
   workoutId: string,
   opts: { countFilled: boolean },
 ): Promise<void> {
-  await db.transaction('rw', [db.workouts, db.entries, db.exercises], async () => {
+  await db.transaction('rw', [db.workouts, db.entries, db.exercises, db.meta], async () => {
     const w = await db.workouts.get(workoutId)
     if (w?.status !== 'active') return
+    // Итоги посчитаются сразу после — но если приложение закроют раньше, досчитаются при запуске.
+    await db.meta.put({ key: SUMMARIES_DIRTY, value: true })
     const now = Date.now()
     const entries = await db.entries.where('workoutId').equals(workoutId).toArray()
+    const finishedAt = finishTime(w, entries, now)
     const exercises = await db.exercises.bulkGet(entries.map((e) => e.exerciseId))
     const kinds = new Map(exercises.filter((x) => x !== undefined).map((x) => [x.id, x.kind]))
     const keep: WorkoutEntry[] = []
@@ -534,7 +536,7 @@ export async function finishWorkout(
       const sets = e.sets
         .map((s) =>
           !s.done && opts.countFilled && isComplete(kind, s)
-            ? { ...s, done: true, doneAt: now }
+            ? { ...s, done: true, doneAt: finishedAt }
             : s,
         )
         .filter((s) => s.done)
@@ -545,9 +547,27 @@ export async function finishWorkout(
     keep.sort((a, b) => a.order - b.order).forEach((e, i) => (e.order = i))
     await db.entries.bulkDelete(drop)
     await db.entries.bulkPut(keep)
-    await db.workouts.put({ ...w, status: 'done', finishedAt: now, updatedAt: now })
+    await db.workouts.put({ ...w, status: 'done', finishedAt, updatedAt: now })
   })
   await recomputeAllSummaries()
+}
+
+/** Тренировку завершили спустя столько после последнего действия — значит, забыли. */
+const FORGOTTEN_MS = 3 * 3_600_000
+
+/**
+ * Когда тренировка закончилась. Обычно — сейчас. Но если её забыли завершить
+ * и вспомнили утром, конец — последнее действие, а не 20 часов «тренировки».
+ */
+export function finishTime(
+  w: Pick<Workout, 'startedAt' | 'updatedAt'>,
+  entries: readonly Pick<WorkoutEntry, 'sets'>[],
+  now: number,
+): number {
+  let last = Math.max(w.startedAt, w.updatedAt)
+  for (const e of entries)
+    for (const s of e.sets) if (s.doneAt !== undefined) last = Math.max(last, s.doneAt)
+  return now - last > FORGOTTEN_MS ? Math.min(now, last + 60_000) : now
 }
 
 /** Отменить идущую тренировку целиком. */

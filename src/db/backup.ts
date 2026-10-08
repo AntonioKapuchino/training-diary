@@ -2,12 +2,12 @@ import { formatTime, todayISO } from '@/domain/dates'
 import { newId } from '@/domain/ids'
 import { MUSCLE_LABEL, SET_TYPE_LABEL } from '@/domain/labels'
 import { getSettings, sanitizeSettings, updateSettings } from '@/settings/settings'
-import { cleanBackup, isBackupV2, type BackupV2 } from './backup-format'
+import { cleanBackup, isBackupV2, validTimestamp, type BackupV2 } from './backup-format'
 import { CATALOG } from './catalog'
 import { db, getMeta, setMeta, type Snapshot, type SnapshotReason } from './db'
 import { convertLegacy, isLegacyBackup } from './legacy'
 import { ensureCatalog } from './seed'
-import { recomputeAllSummaries } from './summaries'
+import { recomputeAllSummaries, SUMMARIES_DIRTY } from './summaries'
 import { flushRecompute } from './workouts'
 
 export async function collectBackup(): Promise<BackupV2> {
@@ -63,8 +63,10 @@ export async function csvFile(): Promise<File> {
   const byWorkout = new Map<string, typeof entries>()
   for (const e of entries) byWorkout.set(e.workoutId, [...(byWorkout.get(e.workoutId) ?? []), e])
   const cell = (v: string | number | undefined) => {
-    const s = v === undefined ? '' : typeof v === 'number' ? String(v).replace('.', ',') : v
-    return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    let s = v === undefined ? '' : typeof v === 'number' ? String(v).replace('.', ',') : v
+    // Заметка «+2,5 кг в след. раз» иначе откроется в Excel как формула.
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`
+    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const rows = [
     [
@@ -137,6 +139,17 @@ function exportedAtOf(raw: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
+function isNewerBackup(raw: unknown): boolean {
+  const o = raw as { app?: unknown; format?: unknown } | null
+  return (
+    typeof o === 'object' &&
+    o !== null &&
+    o.app === 'training-diary' &&
+    typeof o.format === 'number' &&
+    o.format > 2
+  )
+}
+
 /** Разбирает файл и показывает, что в нём, — ничего не записывая. */
 export function previewImport(text: string): ImportPreview {
   let raw: unknown
@@ -168,6 +181,10 @@ export function previewImport(text: string): ImportPreview {
     }
     dropped = converted.report.skippedWorkouts
     source = 'legacy'
+  } else if (isNewerBackup(raw)) {
+    throw new ImportError(
+      'Копию сделала более новая версия дневника. Обнови приложение — закрой его и открой снова — и загрузи файл ещё раз.',
+    )
   } else {
     throw new ImportError('Файл не похож на резервную копию дневника тренировок.')
   }
@@ -181,7 +198,7 @@ export function previewImport(text: string): ImportPreview {
     bodyLogs: data.bodyLogs.length,
     ...(dates[0] ? { firstDate: dates[0] } : {}),
     ...(dates.at(-1) ? { lastDate: dates.at(-1) } : {}),
-    ...(data.exportedAt ? { exportedAt: data.exportedAt } : {}),
+    ...(validTimestamp(data.exportedAt) ? { exportedAt: data.exportedAt } : {}),
     dropped,
   }
 }
@@ -190,8 +207,10 @@ export function previewImport(text: string): ImportPreview {
 async function replaceAll(data: BackupV2): Promise<void> {
   await db.transaction(
     'rw',
-    [db.exercises, db.workouts, db.entries, db.templates, db.bodyLogs],
+    [db.exercises, db.workouts, db.entries, db.templates, db.bodyLogs, db.meta],
     async () => {
+      // Итоги загруженных тренировок пересчитаются ниже; не успеют — при следующем запуске.
+      await db.meta.put({ key: SUMMARIES_DIRTY, value: true })
       await Promise.all([
         db.exercises.clear(),
         db.workouts.clear(),
@@ -249,21 +268,20 @@ export async function autoSnapshot(): Promise<void> {
   await createSnapshot('auto')
 }
 
-/** Пора ли напомнить о резервной копии: давно не сохранял, а новые тренировки есть. */
+/**
+ * Пора ли напомнить о резервной копии: давно не сохранял, а с тех пор что-то изменилось —
+ * новая тренировка, внесённая задним числом, правка старой или замер тела.
+ */
 export async function backupDue(
   reminderDays: number,
 ): Promise<{ due: boolean; days: number | null }> {
   if (reminderDays <= 0) return { due: false, days: null }
   const last = await lastExportAt()
-  const lastDone = await db.workouts
-    .where('[status+startedAt]')
-    .between(['done', 0], ['done', Infinity])
-    .last()
-  if (!lastDone) return { due: false, days: null }
-  if (last === undefined) {
-    const count = await db.workouts.where('status').equals('done').count()
-    return { due: count >= 3, days: null }
-  }
+  const done = await db.workouts.where('status').equals('done').toArray()
+  if (done.length === 0) return { due: false, days: null }
+  if (last === undefined) return { due: done.length >= 3, days: null }
+  const bodyLogs = await db.bodyLogs.toArray()
+  const changedAt = [...done, ...bodyLogs].reduce((m, x) => Math.max(m, x.updatedAt), 0)
   const days = Math.floor((Date.now() - last) / 86_400_000)
-  return { due: days >= reminderDays && lastDone.startedAt > last, days }
+  return { due: days >= reminderDays && changedAt > last, days }
 }

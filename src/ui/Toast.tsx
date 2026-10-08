@@ -38,8 +38,13 @@ function useToast(): ToastData | null {
   )
 }
 
-/** Поднимается над таб-баром и мини-плеером тренировки. */
-export function Toaster({ offset }: { offset: number }) {
+/**
+ * Внизу — над таб-баром и мини-плеером. На экране тренировки низ занят клавиатурой
+ * и таймером отдыха — там сообщение приходит сверху, под заголовком, как баннер в iOS.
+ * Меню действий (z-60) выше сообщений — их кнопки не перекрываются; экран итогов (z-50) ниже,
+ * там сообщения нужны: «Программа обновлена».
+ */
+export function Toaster({ offset, top = false }: { offset: number; top?: boolean }) {
   const t = useToast()
   useEffect(() => {
     if (!t) return
@@ -53,17 +58,21 @@ export function Toaster({ offset }: { offset: number }) {
 
   return createPortal(
     <div
-      className="pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-4"
-      style={{ bottom: `calc(${offset}px + var(--safe-bottom))` }}
+      className="pointer-events-none fixed inset-x-0 z-[55] flex justify-center px-4"
+      style={
+        top
+          ? { top: 'calc(var(--safe-top) + 4.75rem)' }
+          : { bottom: `calc(${String(offset)}px + var(--safe-bottom))` }
+      }
       aria-live="polite"
     >
       <AnimatePresence>
         {t && (
           <motion.div
             key={t.id}
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            initial={{ opacity: 0, y: top ? -16 : 16, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            exit={{ opacity: 0, y: top ? -8 : 8, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 500, damping: 38 }}
             className="pointer-events-auto flex max-w-[30rem] items-center gap-3 rounded-full py-2.5 pr-2.5 pl-5 text-subhead glass"
             role="status"

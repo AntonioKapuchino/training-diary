@@ -5,6 +5,7 @@ import { useDoneWorkouts, useTemplates } from '@/db/hooks'
 import { createPastWorkout, startWorkout } from '@/db/workouts'
 import { addDays, formatRelativeDay, isISODate, todayISO } from '@/domain/dates'
 import { haptic } from '@/lib/haptics'
+import { useBusy } from '@/lib/useBusy'
 import { Button } from '@/ui/Button'
 import { Sheet } from '@/ui/Sheet'
 import { workoutTitle } from '../history/WorkoutRow'
@@ -160,13 +161,16 @@ function PastForm({ onClose, onCreated }: { onClose: () => void; onCreated: () =
   const [date, setDate] = useState(addDays(todayISO(), -1))
   const [time, setTime] = useState('18:00')
   const valid = isISODate(date) && date <= todayISO() && /^\d{2}:\d{2}$/.test(time)
+  const [busy, run] = useBusy()
 
-  async function create() {
+  function create() {
     if (!valid) return
-    const id = await createPastWorkout(date, time)
-    onClose()
-    onCreated()
-    void navigate(`/history/${id}/edit`)
+    void run(async () => {
+      const id = await createPastWorkout(date, time)
+      onClose()
+      onCreated()
+      void navigate(`/history/${id}/edit`)
+    })
   }
 
   return (
@@ -199,7 +203,7 @@ function PastForm({ onClose, onCreated }: { onClose: () => void; onCreated: () =
       {!isISODate(date) && (
         <p className="px-4 text-footnote text-danger">Выбери дату тренировки.</p>
       )}
-      <Button block size="lg" disabled={!valid} onClick={() => void create()}>
+      <Button block size="lg" disabled={!valid || busy} onClick={create}>
         Продолжить
       </Button>
     </div>

@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Archive, ChevronRight, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useSessionState } from '@/lib/sessionState'
 import { Link } from 'react-router'
 import { db } from '@/db/db'
 import { useExercises } from '@/db/hooks'
@@ -39,8 +40,8 @@ function useUsage() {
 export function ExercisesPage() {
   const exercises = useExercises()
   const usage = useUsage()
-  const [query, setQuery] = useState('')
-  const [muscle, setMuscle] = useState<MuscleGroup | 'all'>('all')
+  const [query, setQuery] = useSessionState('exercises.query', '')
+  const [muscle, setMuscle] = useSessionState<MuscleGroup | 'all'>('exercises.muscle', 'all')
   const [creating, setCreating] = useState(false)
   const [showArchive, setShowArchive] = useState(false)
 

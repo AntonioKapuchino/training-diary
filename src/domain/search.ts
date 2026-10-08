@@ -3,11 +3,15 @@
  * Иначе «подъем» не находит «Подъём на носки» — и пользователь заводит дубль.
  */
 export function normalizeText(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
+  return (
+    s
+      // «е» + U+0308 из вставленного текста — то же «ё», что и набранное.
+      .normalize('NFC')
+      .toLowerCase()
+      .replace(/ё/g, 'е')
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .trim()
+  )
 }
 
 /**
@@ -42,5 +46,9 @@ export function searchItems<T>(items: readonly T[], query: string, text: (item: 
 
 /** Совпадение названий с точностью до регистра, «ё» и пунктуации. */
 export function sameName(a: string, b: string): boolean {
-  return normalizeText(a) === normalizeText(b)
+  const na = normalizeText(a)
+  const nb = normalizeText(b)
+  // Названия из одних значков («💪», «🔥») после нормализации пусты — сравниваем как есть.
+  if (na === '' && nb === '') return a.trim().toLowerCase() === b.trim().toLowerCase()
+  return na === nb
 }

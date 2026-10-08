@@ -124,6 +124,7 @@ export function WorkoutScreen({ workout }: { workout: Workout }) {
         if (info.offset.y > 120 || info.velocity.y > 700) workoutUi.minimize()
       }}
       role="dialog"
+      aria-modal="true"
       aria-label={`Тренировка: ${title}`}
     >
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-workout-scroll>
@@ -134,7 +135,11 @@ export function WorkoutScreen({ workout }: { workout: Workout }) {
               drag.start(e)
             }}
           >
-            <div className="mx-auto mt-1.5 h-[0.3125rem] w-9 rounded-full bg-fill" aria-hidden />
+            <div
+              className="mx-auto mt-1.5 h-[0.3125rem] w-9 rounded-full bg-fill transition-opacity duration-200"
+              data-grabber
+              aria-hidden
+            />
           </div>
           <div className="flex items-center gap-2 px-3 pt-1 pb-2.5">
             <IconButton label="Свернуть" variant="gray" onClick={workoutUi.minimize}>

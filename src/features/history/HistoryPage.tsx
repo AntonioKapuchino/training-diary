@@ -1,5 +1,6 @@
 import { CalendarDays, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useSessionState } from '@/lib/sessionState'
 import { useNavigate } from 'react-router'
 import { useDoneWorkouts } from '@/db/hooks'
 import { addMonths, formatMonthYear, startOfMonth, todayISO } from '@/domain/dates'
@@ -17,7 +18,7 @@ import { WorkoutRow } from './WorkoutRow'
 export function HistoryPage() {
   const workouts = useDoneWorkouts()
   const navigate = useNavigate()
-  const [month, setMonth] = useState(() => startOfMonth(todayISO()))
+  const [month, setMonth] = useSessionState('history.month', startOfMonth(todayISO()))
   const [pastOpen, setPastOpen] = useState(false)
 
   const days = useMemo(() => {

@@ -178,9 +178,15 @@ function Detail({ exercise }: { exercise: Exercise }) {
       subtitle={
         <span className="inline-flex items-center gap-1.5">
           <MuscleDot muscle={exercise.muscle} />
-          {MUSCLE_LABEL[exercise.muscle]} · {EQUIPMENT_LABEL[exercise.equipment]} ·{' '}
-          {KIND_LABEL[exercise.kind]}
-          {exercise.archivedAt ? ' · в архиве' : ''}
+          {/* «Кардио · Тренажёр · Кардио» — группа и тип совпадают, второй раз не пишем. */}
+          {[
+            ...new Set([
+              MUSCLE_LABEL[exercise.muscle],
+              EQUIPMENT_LABEL[exercise.equipment],
+              KIND_LABEL[exercise.kind],
+            ]),
+            ...(exercise.archivedAt ? ['в архиве'] : []),
+          ].join(' · ')}
         </span>
       }
     >

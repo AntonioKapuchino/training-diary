@@ -6,8 +6,12 @@ import { useNow } from '@/lib/useNow'
 import { useRestTicker } from './RestTimer'
 import { workoutUi } from './store'
 
-/** Капсула идущей тренировки над таб-баром — как мини-плеер в «Музыке». */
-export function MiniBar({ workout }: { workout: Workout }) {
+/**
+ * Капсула идущей тренировки над таб-баром — как мини-плеер в «Музыке».
+ * В редакторах таб-бара нет — капсула опускается к нижнему краю, а страница
+ * оставляет под неё место (--minibar-space).
+ */
+export function MiniBar({ workout, tabbar }: { workout: Workout; tabbar: boolean }) {
   const now = useNow(1000)
   const rest = useRestTicker()
   const elapsed = Math.max(0, (now - workout.startedAt) / 1000)
@@ -18,7 +22,11 @@ export function MiniBar({ workout }: { workout: Workout }) {
       exit={{ y: 30, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 460, damping: 38 }}
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4"
-      style={{ bottom: 'calc(max(0.5rem, var(--safe-bottom) - 0.5rem) + 4.375rem)' }}
+      style={{
+        bottom: tabbar
+          ? 'calc(max(0.5rem, var(--safe-bottom) - 0.5rem) + 4.375rem)'
+          : 'max(0.5rem, var(--safe-bottom) - 0.5rem)',
+      }}
     >
       <button
         type="button"

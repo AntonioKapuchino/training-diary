@@ -97,14 +97,15 @@ export function workoutSeconds(w: { startedAt: number; finishedAt?: number | und
 }
 
 /**
- * Сколько недель подряд выполнена цель «N тренировок в неделю».
+ * Сколько недель подряд выполнена цель «N тренировок в неделю». `dates` — по дате
+ * на тренировку: две в один день — две, как и в кольце недели.
  * Текущая неделя засчитывается, если цель уже выполнена; если ещё нет — серия
  * не прерывается, пока неделя не кончилась.
  */
 export function streakWeeks(dates: readonly string[], goal: number, today: string): number {
   if (goal <= 0) return 0
   const perWeek = new Map<string, number>()
-  for (const d of new Set(dates)) {
+  for (const d of dates) {
     const w = startOfWeek(d)
     perWeek.set(w, (perWeek.get(w) ?? 0) + 1)
   }
@@ -162,12 +163,17 @@ export function sessionPoint(
     pace: 0,
     sets: 0,
   }
+  // Темп — только по подходам, где есть и время, и дистанция: заминка без дистанции
+  // не должна делать пробежку медленнее.
+  let paceSec = 0
+  let paceKm = 0
   for (const s of sets) {
     if (!counts(kind, s)) continue
     p.sets++
     const w = s.weight ?? 0
     const r = s.reps ?? 0
     const sec = s.seconds ?? 0
+    const km = s.distance ?? 0
     p.weight = Math.max(p.weight, w)
     p.e1rm = Math.max(p.e1rm, kind === 'strength' ? estimate1RM(w, r) : 0)
     p.volume += setVolume(kind, s)
@@ -175,12 +181,14 @@ export function sessionPoint(
     p.totalReps += r
     p.duration = Math.max(p.duration, sec)
     p.totalDuration += sec
-    p.distance += s.distance ?? 0
+    p.distance += km
+    if (sec > 0 && km > 0) {
+      paceSec += sec
+      paceKm += km
+    }
   }
   if (p.sets === 0) return null
-  if (kind === 'cardio' && p.distance >= 0.5 && p.totalDuration > 0) {
-    p.pace = p.totalDuration / p.distance
-  }
+  if (kind === 'cardio' && paceKm >= 0.5) p.pace = paceSec / paceKm
   return p
 }
 

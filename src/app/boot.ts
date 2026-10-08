@@ -2,6 +2,7 @@ import { autoSnapshot } from '@/db/backup'
 import { db } from '@/db/db'
 import { migrateLegacy, type MigrationState } from '@/db/migrate'
 import { ensureCatalog } from '@/db/seed'
+import { repairSummaries } from '@/db/summaries'
 import { requestPersistence } from '@/lib/storage'
 
 export interface BootResult {
@@ -19,6 +20,7 @@ export function boot(): Promise<BootResult> {
     await db.open()
     await ensureCatalog()
     const migration = await migrateLegacy()
+    void repairSummaries().catch(() => undefined)
     void requestPersistence()
     void autoSnapshot().catch(() => undefined)
     return { migration }

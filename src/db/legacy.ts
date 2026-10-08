@@ -76,26 +76,46 @@ export function isEmptyLegacy(d: LegacyData): boolean {
 
 /**
  * Читает старую базу. Если её нет, открытие без версии создало бы пустую —
- * поэтому создание отменяется в onupgradeneeded.
+ * поэтому создание отменяется в onupgradeneeded, и ответ — null.
+ * База есть, но не читается (занята, сбой, таймаут) — ошибка: отличаем от «нет».
  */
-export function readLegacyDatabase(factory: IDBFactory = indexedDB): Promise<LegacyData | null> {
-  return new Promise((resolve) => {
+export function readLegacyDatabase(
+  factory: IDBFactory = indexedDB,
+  timeoutMs = 8000,
+): Promise<LegacyData | null> {
+  return new Promise((resolve, reject) => {
+    // Зависшее открытие (базу держит другая вкладка) не должно вешать запуск.
+    const timer = setTimeout(() => {
+      reject(new Error('Старая база не открылась вовремя'))
+    }, timeoutMs)
+    const done = (value: LegacyData | null) => {
+      clearTimeout(timer)
+      resolve(value)
+    }
+    const fail = (error: unknown) => {
+      clearTimeout(timer)
+      reject(error instanceof Error ? error : new Error(String(error)))
+    }
     let req: IDBOpenDBRequest
     try {
       req = factory.open(LEGACY_DB_NAME)
-    } catch {
-      resolve(null)
+    } catch (e) {
+      fail(e)
       return
     }
+    // Базы нет: открытие начало бы её создавать — отменяем, это и есть ответ «нет».
+    let absent = false
     req.onupgradeneeded = () => {
+      absent = true
       req.transaction?.abort()
     }
     req.onerror = (e) => {
       e.preventDefault()
-      resolve(null)
+      if (absent) done(null)
+      else fail(req.error)
     }
     req.onblocked = () => {
-      resolve(null)
+      fail(new Error('Старую базу держит другая вкладка'))
     }
     req.onsuccess = () => {
       const idb = req.result
@@ -103,23 +123,32 @@ export function readLegacyDatabase(factory: IDBFactory = indexedDB): Promise<Leg
       const names = LEGACY_STORES.filter((n) => idb.objectStoreNames.contains(n))
       if (names.length === 0) {
         idb.close()
-        resolve(out)
+        done(out)
         return
       }
-      const tx = idb.transaction(names, 'readonly')
-      for (const n of names) {
-        const r = tx.objectStore(n).getAll()
-        r.onsuccess = () => {
-          out[n] = r.result as unknown[]
+      try {
+        const tx = idb.transaction(names, 'readonly')
+        for (const n of names) {
+          const r = tx.objectStore(n).getAll()
+          r.onsuccess = () => {
+            out[n] = r.result as unknown[]
+          }
         }
-      }
-      tx.oncomplete = () => {
+        tx.oncomplete = () => {
+          idb.close()
+          done(out)
+        }
+        tx.onerror = () => {
+          idb.close()
+          fail(tx.error)
+        }
+        tx.onabort = () => {
+          idb.close()
+          fail(tx.error ?? new Error('Чтение старой базы прервано'))
+        }
+      } catch (e) {
         idb.close()
-        resolve(out)
-      }
-      tx.onerror = () => {
-        idb.close()
-        resolve(null)
+        fail(e)
       }
     }
   })
@@ -159,10 +188,18 @@ function convertSetValues(raw: unknown): Partial<TemplateSet> | null {
 }
 
 export function convertLegacy(
-  data: LegacyData,
+  raw: LegacyData,
   catalog: readonly CatalogItem[],
   now = Date.now(),
 ): ConvertResult {
+  // В файле первой версии могут не быть упражнений или шаблонов — это не повод падать.
+  const list = (x: unknown): unknown[] => (Array.isArray(x) ? x : [])
+  const data: LegacyData = {
+    exercises: list(raw.exercises),
+    workouts: list(raw.workouts),
+    entries: list(raw.entries),
+    templates: list(raw.templates),
+  }
   const legacyExercises = new Map<
     number,
     { name: string; muscle: MuscleGroup; kind: ExerciseKind; custom: boolean }
