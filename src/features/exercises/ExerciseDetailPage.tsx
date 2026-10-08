@@ -19,11 +19,14 @@ import {
   formatPace,
   formatVolume,
   formatWeight,
+  plural,
 } from '@/domain/format'
 import { EQUIPMENT_LABEL, KIND_LABEL, MUSCLE_LABEL, muscleColor } from '@/domain/labels'
+import { percentTable } from '@/domain/loading'
 import { repMaxes } from '@/domain/records'
 import { METRICS, sessionPoint, type MetricKey, type SessionPoint } from '@/domain/stats'
-import type { Exercise, ExerciseKind } from '@/domain/types'
+import type { Equipment, Exercise, ExerciseKind } from '@/domain/types'
+import { useSettings } from '@/settings/settings'
 import { ActionSheet, type Action } from '@/ui/ActionSheet'
 import { IconButton } from '@/ui/Button'
 import { LineChart } from '@/ui/charts/LineChart'
@@ -255,6 +258,9 @@ function Detail({ exercise }: { exercise: Exercise }) {
           </Section>
 
           {exercise.kind === 'strength' && <RepMaxes sets={allSets} />}
+          {exercise.kind === 'strength' && (
+            <PercentTable points={points} equipment={exercise.equipment} />
+          )}
 
           <Section header="История">
             {(history ?? []).slice(0, 30).map((h) => (
@@ -425,10 +431,7 @@ function RepMaxes({ sets }: { sets: Parameters<typeof repMaxes>[0] }) {
     >
       <div className="grid grid-cols-3">
         {shown.map((n, i) => (
-          <div
-            key={n}
-            className={`px-4 py-3 ${i % 3 !== 0 ? 'shadow-[inset_0.5px_0_0_var(--separator)]' : ''} ${i >= 3 ? 'hairline-t' : ''}`}
-          >
+          <div key={n} className={`px-4 py-3 ${gridCellLines(i, 3)}`}>
             <div className="text-caption text-label-2">{n} повт.</div>
             <div className="font-rounded text-body font-semibold tabular">
               {formatWeight(rm[n - 1] ?? 0)}
@@ -438,4 +441,52 @@ function RepMaxes({ sets }: { sets: Parameters<typeof repMaxes>[0] }) {
       </div>
     </Section>
   )
+}
+
+/**
+ * Проценты от расчётного максимума — для программ вроде «5 × 5 на 80 %». Максимум —
+ * лучший за три месяца (после перерыва старый рекорд завысил бы веса), если за них
+ * нет тренировок — за всё время. Вес округлён до того, что реально собрать.
+ */
+function PercentTable({ points, equipment }: { points: SessionPoint[]; equipment: Equipment }) {
+  const settings = useSettings()
+  const since = addDays(todayISO(), -90)
+  const best = (list: SessionPoint[]) => list.reduce((m, p) => Math.max(m, p.e1rm), 0)
+  const recent = best(points.filter((p) => p.date >= since))
+  const base = recent > 0 ? recent : best(points)
+  const rows = percentTable(base, equipment, settings)
+  if (rows.length === 0) return null
+  return (
+    <Section
+      header={`Проценты от максимума ${formatWeight(Math.round(base * 10) / 10)}`}
+      footer={`Расчётный максимум ${recent > 0 ? 'за 3 месяца' : 'за всё время'}. Вес округлён ${equipment === 'barbell' ? 'под гриф и блины' : 'под шаг веса'} из настроек, повторы — примерно сколько получится`}
+    >
+      <div className="grid grid-cols-3">
+        {rows.map((r, i) => (
+          <div key={r.percent} className={`px-4 py-3 ${gridCellLines(i, 3)}`}>
+            <div className="text-caption text-label-2">{r.percent} %</div>
+            <div className="font-rounded text-body font-semibold tabular">
+              {formatWeight(r.weight)}
+            </div>
+            <div className="text-caption-2 text-label-2 tabular">
+              ≈ {r.reps} {plural(r.reps, 'повтор', 'повтора', 'повторов')}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * Линии между ячейками сетки: слева — у всех, кроме первого столбца, сверху — у всех,
+ * кроме первой строки. Обе — одной тенью: два класса с box-shadow перебили бы друг друга.
+ */
+function gridCellLines(i: number, cols: number): string {
+  const left = i % cols !== 0
+  const top = i >= cols
+  if (left && top)
+    return 'shadow-[inset_0.5px_0_0_var(--separator),inset_0_0.5px_0_var(--separator)]'
+  if (left) return 'shadow-[inset_0.5px_0_0_var(--separator)]'
+  return top ? 'hairline-t' : ''
 }

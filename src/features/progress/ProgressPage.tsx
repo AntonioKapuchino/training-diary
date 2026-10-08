@@ -1,10 +1,10 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ChartNoAxesColumn, ChevronRight, Scale, Trophy } from 'lucide-react'
 import { useMemo } from 'react'
-import { useSessionState } from '@/lib/sessionState'
 import { Link } from 'react-router'
 import { useAllEntries, useBodyLogs, useDoneWorkouts, useExerciseMap } from '@/db/hooks'
 import { workoutRecords } from '@/db/workouts'
+import { BODY_METRICS, formatBodyValue } from '@/domain/body'
 import {
   addDays,
   addMonths,
@@ -15,16 +15,17 @@ import {
   startOfWeek,
   todayISO,
 } from '@/domain/dates'
-import { formatDuration, formatNumber, formatVolume, formatWeight, plural } from '@/domain/format'
+import { countLabel, formatDuration, formatNumber, formatVolume, plural } from '@/domain/format'
 import { MUSCLE_LABEL, MUSCLES, muscleColor } from '@/domain/labels'
 import { RECORD_LABEL } from '@/domain/records'
 import { muscleSetCounts, sessionPoint, workoutSeconds, type SessionPoint } from '@/domain/stats'
 import type { Exercise, Workout, WorkoutEntry, WorkoutSet } from '@/domain/types'
+import { useSessionState } from '@/lib/sessionState'
 import { Bars, type Bar } from '@/ui/charts/Bars'
 import { HBars } from '@/ui/charts/HBars'
 import { Sparkline } from '@/ui/charts/Sparkline'
 import { EmptyState } from '@/ui/EmptyState'
-import { Section } from '@/ui/List'
+import { Row, Section } from '@/ui/List'
 import { MuscleDot } from '@/ui/MuscleDot'
 import { Page } from '@/ui/Page'
 import { Segmented } from '@/ui/Segmented'
@@ -227,6 +228,8 @@ export function ProgressPage() {
         </Section>
       )}
 
+      <MonthsSection workouts={workouts} today={today} />
+
       <RecentRecords workouts={workouts} exercises={exercises} />
 
       <ExerciseTrends entries={periodEntries} workouts={current} exercises={exercises} />
@@ -404,8 +407,21 @@ function ExerciseTrends({
 }
 
 function BodyCard({ logs }: { logs: ReturnType<typeof useBodyLogs> }) {
-  const withWeight = (logs ?? []).filter((l) => l.weight !== undefined)
-  const last = withWeight.at(-1)
+  const all = logs ?? []
+  const withWeight = all.filter((l) => l.weight !== undefined)
+  const last = all.at(-1)
+  // Под заголовком — последний замер целиком: вес и пара обхватов, если их записывали.
+  const summary = last
+    ? [
+        ...BODY_METRICS.filter((m) => last[m.key] !== undefined)
+          .slice(0, 3)
+          .map((m) =>
+            m.key === 'weight'
+              ? formatBodyValue('weight', last.weight ?? 0)
+              : `${m.short} ${formatBodyValue(m.key, last[m.key] ?? 0)}`,
+          ),
+      ].join(' · ')
+    : 'Вес, обхваты и процент жира — увидишь динамику'
   return (
     <Section title="Тело" plain>
       <Link
@@ -416,12 +432,8 @@ function BodyCard({ logs }: { logs: ReturnType<typeof useBodyLogs> }) {
           <Scale className="size-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-body font-semibold">Вес тела</span>
-          <span className="block text-footnote text-label-2">
-            {last?.weight !== undefined
-              ? `${formatWeight(last.weight)} · ${formatRelativeDay(last.date)}`
-              : 'Записывай вес — увидишь динамику'}
-          </span>
+          <span className="block text-body font-semibold">Замеры тела</span>
+          <span className="block truncate text-footnote text-label-2">{summary}</span>
         </span>
         {withWeight.length > 1 && (
           <Sparkline
@@ -435,6 +447,39 @@ function BodyCard({ logs }: { logs: ReturnType<typeof useBodyLogs> }) {
           aria-hidden
         />
       </Link>
+    </Section>
+  )
+}
+
+/** Итоги месяца: текущий (идёт) и пара прошлых, где были тренировки. */
+function MonthsSection({ workouts, today }: { workouts: Workout[]; today: string }) {
+  const months = new Map<string, { count: number; records: number }>()
+  for (const w of workouts) {
+    const m = startOfMonth(w.date)
+    const item = months.get(m) ?? { count: 0, records: 0 }
+    item.count++
+    item.records += w.summary?.records ?? 0
+    months.set(m, item)
+  }
+  const current = startOfMonth(today)
+  const rows = [...months.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, 3)
+  if (rows.length === 0) return null
+  return (
+    <Section header="Итоги месяца">
+      {rows.map(([m, item]) => (
+        <Row
+          key={m}
+          to={`/progress/month/${m.slice(0, 7)}`}
+          title={`${formatMonthYear(m, today)}${m === current ? ' · идёт' : ''}`}
+          subtitle={[
+            countLabel(item.count, 'тренировка', 'тренировки', 'тренировок'),
+            item.records > 0 ? countLabel(item.records, 'рекорд', 'рекорда', 'рекордов') : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+          chevron
+        />
+      ))}
     </Section>
   )
 }

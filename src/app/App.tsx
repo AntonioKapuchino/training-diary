@@ -1,3 +1,4 @@
+import { MotionConfig } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { RouterProvider } from 'react-router/dom'
 import { boot } from './boot'
@@ -21,7 +22,12 @@ export function App() {
 
   if (state.status === 'loading') return <div className="min-h-dvh bg-bg" aria-busy="true" />
   if (state.status === 'error') return <BootError message={state.message} />
-  return <RouterProvider router={router} />
+  // «Уменьшить движение» в настройках iPhone: шторки и экраны появляются без выезда.
+  return (
+    <MotionConfig reducedMotion="user">
+      <RouterProvider router={router} />
+    </MotionConfig>
+  )
 }
 
 function BootError({ message }: { message: string }) {

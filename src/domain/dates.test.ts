@@ -14,6 +14,8 @@ import {
   toISODate,
   toTimeInput,
   weekDays,
+  monthGenitive,
+  monthPrepositional,
 } from './dates'
 
 const s = (x: string) => x.replace(/\s/g, ' ')
@@ -74,5 +76,10 @@ describe('подписи', () => {
   it('месяц с заглавной, год — только для прошлых лет', () => {
     expect(formatMonthYear('2026-10-04', today)).toBe('Октябрь')
     expect(formatMonthYear('2025-12-01', today)).toBe('Декабрь 2025')
+  })
+  it('месяц в падежах: «итоги сентября», «чем в августе»', () => {
+    expect(monthGenitive('2026-09-01')).toBe('сентября')
+    expect(monthGenitive('2026-05-17')).toBe('мая')
+    expect(monthPrepositional('2026-08-01')).toBe('августе')
   })
 })

@@ -277,7 +277,7 @@ function ImportSheet({
                 </li>
               )}
               {preview.bodyLogs > 0 && (
-                <li>{countLabel(preview.bodyLogs, 'замер', 'замера', 'замеров')} веса</li>
+                <li>{countLabel(preview.bodyLogs, 'замер', 'замера', 'замеров')} тела</li>
               )}
               {preview.dropped > 0 && (
                 <li className="text-warning">Пропущено битых записей: {preview.dropped}</li>

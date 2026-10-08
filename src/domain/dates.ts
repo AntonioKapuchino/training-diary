@@ -142,6 +142,31 @@ export function formatMonthYear(iso: string, today = todayISO()): string {
   return sameYear(iso, today) ? cap : `${cap} ${iso.slice(0, 4)}`
 }
 
+/** «сентября» — для «Итоги сентября», «чем в августе» пишется через monthPrepositional. */
+export function monthGenitive(iso: string): string {
+  return fmtDayMonth.format(parseISODate(iso)).replace(/^\d+\s*/u, '')
+}
+
+const PREPOSITIONAL = [
+  'январе',
+  'феврале',
+  'марте',
+  'апреле',
+  'мае',
+  'июне',
+  'июле',
+  'августе',
+  'сентябре',
+  'октябре',
+  'ноябре',
+  'декабре',
+] as const
+
+/** «в сентябре». */
+export function monthPrepositional(iso: string): string {
+  return PREPOSITIONAL[parseISODate(iso).getMonth()] ?? ''
+}
+
 /** «18:42». */
 export function formatTime(ms: number): string {
   return fmtTime.format(new Date(ms))

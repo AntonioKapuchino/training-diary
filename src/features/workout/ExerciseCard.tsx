@@ -1,4 +1,4 @@
-import { Ellipsis, MessageSquareText, Plus, Timer } from 'lucide-react'
+import { Ellipsis, Flame, MessageSquareText, Plus, Timer } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useMemo } from 'react'
 import { formatClock } from '@/domain/format'
@@ -27,6 +27,8 @@ interface Props {
   onSetMenu: (setId: string) => void
   onDeleteSet: (setId: string) => void
   onAddSet: () => void
+  /** Разминка одним касанием — кнопка рядом с «Подход», пока разминки нет. */
+  onWarmup?: (() => void) | undefined
   onMenu: () => void
   onOpenExercise: () => void
 }
@@ -47,6 +49,7 @@ export function ExerciseCard({
   onSetMenu,
   onDeleteSet,
   onAddSet,
+  onWarmup,
   onMenu,
   onOpenExercise,
 }: Props) {
@@ -157,13 +160,24 @@ export function ExerciseCard({
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={onAddSet}
-        className="flex h-11 w-full items-center justify-center gap-1.5 pressable text-subhead font-semibold text-accent"
-      >
-        <Plus className="size-4" strokeWidth={2.6} /> Подход
-      </button>
+      <div className="flex">
+        <button
+          type="button"
+          onClick={onAddSet}
+          className="flex h-11 w-full items-center justify-center gap-1.5 pressable text-subhead font-semibold text-accent"
+        >
+          <Plus className="size-4" strokeWidth={2.6} /> Подход
+        </button>
+        {onWarmup && (
+          <button
+            type="button"
+            onClick={onWarmup}
+            className="flex h-11 w-full items-center justify-center gap-1.5 pressable text-subhead font-semibold text-warning shadow-[inset_0.5px_0_0_var(--separator)]"
+          >
+            <Flame className="size-4" strokeWidth={2.4} /> Разминка
+          </button>
+        )}
+      </div>
     </motion.article>
   )
 }

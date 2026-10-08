@@ -8,14 +8,21 @@ import {
   previewImport,
   restoreSnapshot,
 } from './backup'
+import { saveBodyLog } from './body'
 import { db } from './db'
 import { createExercise, deleteExercise, mergeExercises, NameTakenError } from './exercises'
 import { ensureCatalog } from './seed'
-import { repairSummaries, SUMMARIES_DIRTY } from './summaries'
+import {
+  repairSummaries,
+  SUMMARIES_DIRTY,
+  SUMMARIES_VERSION,
+  SUMMARIES_VERSION_KEY,
+} from './summaries'
 import { createTemplate, templateFromWorkout, updateTemplateFromWorkout } from './templates'
 import {
   addExercises,
   addSet,
+  addWarmupSets,
   createPastWorkout,
   deleteWorkout,
   finishTime,
@@ -24,6 +31,7 @@ import {
   getActiveWorkout,
   lastSession,
   removeSet,
+  replaceSets,
   restoreSet,
   restoreWorkout,
   startWorkout,
@@ -128,6 +136,31 @@ describe('тренировка', () => {
     expect(finishTime(w, entries, lastSet + 10 * 60_000)).toBe(lastSet + 10 * 60_000)
   })
 
+  it('разминка встаёт перед рабочими подходами и отменяется', async () => {
+    const id = await startWorkout()
+    await addExercises(id, [BENCH])
+    const [entry] = await entriesOf(id)
+    if (!entry) throw new Error('no entry')
+    const before = entry.sets.length
+    const res = await addWarmupSets(entry.id, [
+      { weight: 20, reps: 10 },
+      { weight: 40, reps: 5 },
+    ])
+    expect(res?.added).toBe(2)
+    const after = (await db.entries.get(entry.id))?.sets ?? []
+    expect(after.slice(0, 2)).toMatchObject([
+      { type: 'warmup', weight: 20, reps: 10, done: false },
+      { type: 'warmup', weight: 40, reps: 5, done: false },
+    ])
+    expect(after).toHaveLength(before + 2)
+    // Повторно — не задваивается: неотмеченная разминка заменяется.
+    await addWarmupSets(entry.id, [{ weight: 30, reps: 8 }])
+    const again = (await db.entries.get(entry.id))?.sets ?? []
+    expect(again.filter((s) => s.type === 'warmup').map((s) => s.weight)).toEqual([30])
+    await replaceSets(entry.id, res?.before ?? [])
+    expect((await db.entries.get(entry.id))?.sets).toHaveLength(before)
+  })
+
   it('завершение выбрасывает пустые подходы и упражнения, заполненные — по выбору', async () => {
     const id = await startWorkout()
     await addExercises(id, [BENCH, PULLUPS])
@@ -196,6 +229,21 @@ describe('тренировка', () => {
     await repairSummaries()
     expect((await db.workouts.get(id))?.summary).toMatchObject({ sets: 1, volume: 480 })
     expect(await db.meta.get(SUMMARIES_DIRTY)).toBeUndefined()
+  })
+
+  it('итоги, посчитанные прошлой версией, пересчитываются один раз', async () => {
+    const id = await benchWorkout([[60, 8]])
+    const stale = { exercises: 0, sets: 0, volume: 0, reps: 0, muscles: [], records: 0 }
+    await db.workouts.update(id, { summary: stale })
+    await db.meta.delete(SUMMARIES_VERSION_KEY)
+    await repairSummaries()
+    expect((await db.workouts.get(id))?.summary).toMatchObject({ sets: 1, volume: 480 })
+    expect((await db.meta.get(SUMMARIES_VERSION_KEY))?.value).toBe(SUMMARIES_VERSION)
+
+    // Дальше — только по отметке: без неё запуск ничего не пересчитывает.
+    await db.workouts.update(id, { summary: stale })
+    await repairSummaries()
+    expect((await db.workouts.get(id))?.summary).toEqual(stale)
   })
 
   it('быстрые правки одного упражнения не затирают друг друга', async () => {
@@ -431,5 +479,20 @@ describe('резервная копия', () => {
     }
     const preview = previewImport(JSON.stringify(broken))
     expect(preview.dropped).toBe(2)
+  })
+})
+
+describe('замеры тела', () => {
+  it('стёртое поле удаляется, перенос на занятую дату сливает замеры', async () => {
+    const id = await saveBodyLog({ date: '2026-10-01', weight: 82, waist: 89 })
+    await saveBodyLog({ id, date: '2026-10-01', weight: 82, waist: undefined })
+    expect((await db.bodyLogs.get(id))?.waist).toBeUndefined()
+
+    const other = await saveBodyLog({ date: '2026-10-05', weight: 81, arms: 38 })
+    await saveBodyLog({ id, date: '2026-10-05', weight: 81.5, waist: undefined, note: '' })
+    const all = await db.bodyLogs.toArray()
+    expect(all).toHaveLength(1)
+    expect(all[0]).toMatchObject({ id, date: '2026-10-05', weight: 81.5, arms: 38 })
+    expect(await db.bodyLogs.get(other)).toBeUndefined()
   })
 })

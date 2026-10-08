@@ -5,6 +5,7 @@ import { HistoryPage } from '@/features/history/HistoryPage'
 import { WorkoutDetailPage } from '@/features/history/WorkoutDetailPage'
 import { WorkoutEditPage } from '@/features/history/WorkoutEditPage'
 import { BodyPage } from '@/features/progress/BodyPage'
+import { MonthPage } from '@/features/progress/MonthPage'
 import { ProgressPage } from '@/features/progress/ProgressPage'
 import { DataPage } from '@/features/settings/DataPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
@@ -27,6 +28,7 @@ export const router = createHashRouter([
       { path: 'history/:id/edit', Component: WorkoutEditPage },
       { path: 'progress', Component: ProgressPage },
       { path: 'progress/body', Component: BodyPage },
+      { path: 'progress/month/:month', Component: MonthPage },
       { path: 'exercises', Component: ExercisesPage },
       { path: 'exercises/:id', Component: ExerciseDetailPage },
       { path: 'templates', Component: TemplatesPage },

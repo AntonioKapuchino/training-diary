@@ -376,6 +376,37 @@ export async function restoreSet(r: RemovedSet): Promise<void> {
   })
 }
 
+/**
+ * Разминка перед рабочими подходами. Неотмеченные разминочные подходы заменяются новыми,
+ * выполненные остаются; ступени не тяжелее уже сделанной разминки пропускаются.
+ * Возвращает прежние подходы — для «Отменить».
+ */
+export async function addWarmupSets(
+  entryId: string,
+  plan: readonly { weight: number; reps: number }[],
+): Promise<{ added: number; before: WorkoutSet[] } | undefined> {
+  let result: { added: number; before: WorkoutSet[] } | undefined
+  await mutateEntry(entryId, (e) => {
+    const before = e.sets
+    const doneWarm = before.filter((s) => s.type === 'warmup' && s.done)
+    const working = before.filter((s) => s.type !== 'warmup')
+    const doneMax = doneWarm.reduce((m, s) => Math.max(m, s.weight ?? 0), 0)
+    const fresh = plan
+      .filter((step) => step.weight > doneMax)
+      .map((step) => makeSet({ type: 'warmup', weight: step.weight, reps: step.reps }))
+    e.sets = [...doneWarm, ...fresh, ...working]
+    result = { added: fresh.length, before }
+  })
+  return result
+}
+
+/** Вернуть подходы упражнения как были — отмена разминки. */
+export async function replaceSets(entryId: string, sets: readonly WorkoutSet[]): Promise<void> {
+  await mutateEntry(entryId, (e) => {
+    e.sets = [...sets]
+  })
+}
+
 export async function updateEntry(
   entryId: string,
   patch: { note?: string; restSec?: number | null },

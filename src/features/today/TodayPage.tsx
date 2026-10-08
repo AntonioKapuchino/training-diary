@@ -1,6 +1,17 @@
 import clsx from 'clsx'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowDownToLine, Flame, PartyPopper, Play, Plus, Settings2, Share, X } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ChevronRight,
+  Ellipsis,
+  Flame,
+  PartyPopper,
+  Play,
+  Plus,
+  Settings2,
+  Share,
+  X,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { backupDue, backupFile, markExported } from '@/db/backup'
@@ -8,17 +19,22 @@ import { db, getMeta, setMeta } from '@/db/db'
 import { useActiveWorkout, useDoneWorkouts, useMigrationState, useTemplates } from '@/db/hooks'
 import { markMigrationSeen } from '@/db/migrate'
 import {
+  addMonths,
   dateOf,
   formatAgo,
   formatWeekdayDayMonth,
+  monthGenitive,
+  parseISODate,
+  startOfMonth,
   startOfWeek,
   todayISO,
   weekDays,
   WEEKDAY_SHORT,
 } from '@/domain/dates'
 import { capitalize, countLabel, formatClock, plural } from '@/domain/format'
+import { nextInRotation } from '@/domain/rotation'
 import { streakWeeks } from '@/domain/stats'
-import type { Template } from '@/domain/types'
+import type { Template, Workout } from '@/domain/types'
 import { backupSavedMessage, shareOrDownload } from '@/lib/share'
 import { useNow } from '@/lib/useNow'
 import { useSettings } from '@/settings/settings'
@@ -42,6 +58,14 @@ export function TodayPage() {
   const settings = useSettings()
   const [startOpen, setStartOpen] = useState(false)
   const [templateMenu, setTemplateMenu] = useState<Template | null>(null)
+  // Программы чередуются по кругу: какая следующая — по последней сделанной.
+  const next = useMemo(
+    () =>
+      templates && workouts && templates.length > 1
+        ? nextInRotation(templates, workouts, parseISODate(today).getTime())
+        : undefined,
+    [templates, workouts, today],
+  )
 
   return (
     <Page
@@ -55,6 +79,7 @@ export function TodayPage() {
     >
       <MigrationCard />
       <BackupBanner reminderDays={settings.backupReminderDays} />
+      {workouts !== undefined && <MonthCard workouts={workouts} today={today} />}
 
       {/* До ответа базы кольцо показало бы «Ещё 3 тренировки» — лучше подождать. */}
       {workouts !== undefined && (
@@ -66,6 +91,14 @@ export function TodayPage() {
       <Section plain>
         {active ? (
           <ActiveCard startedAt={active.startedAt} title={active.title} />
+        ) : next ? (
+          <NextCard
+            template={next}
+            onStart={() => void begin({ templateId: next.id })}
+            onOther={() => {
+              setStartOpen(true)
+            }}
+          />
         ) : (
           <Button
             block
@@ -95,6 +128,7 @@ export function TodayPage() {
               <TemplateCard
                 key={t.id}
                 template={t}
+                next={t.id === next?.id}
                 onClick={() => {
                   setTemplateMenu(t)
                 }}
@@ -258,6 +292,51 @@ function WeekCard({ dates, goal, today }: { dates: string[]; goal: number; today
   )
 }
 
+/**
+ * Главная кнопка, когда программы чередуются: следующая по кругу начинается одним
+ * касанием. Пустая тренировка, другая программа, запись задним числом — справа.
+ */
+function NextCard({
+  template,
+  onStart,
+  onOther,
+}: {
+  template: Template
+  onStart: () => void
+  onOther: () => void
+}) {
+  return (
+    <div className="flex items-stretch gap-1 rounded-[var(--radius-card)] bg-accent p-1.5 text-on-accent">
+      <button
+        type="button"
+        onClick={onStart}
+        className="flex min-w-0 flex-1 press-scale items-center gap-3.5 rounded-[calc(var(--radius-card)-0.375rem)] p-2.5 text-left"
+        aria-label={`Начать тренировку: ${template.name}`}
+      >
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-white/20">
+          <Play className="size-6 fill-current" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-body font-semibold">{template.name}</span>
+          <span className="block truncate text-subhead opacity-85">
+            Следующая ·{' '}
+            {countLabel(template.exercises.length, 'упражнение', 'упражнения', 'упражнений')}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onOther}
+        aria-label="Другая тренировка"
+        title="Другая тренировка"
+        className="flex w-12 shrink-0 press-scale items-center justify-center rounded-[calc(var(--radius-card)-0.375rem)] bg-white/15"
+      >
+        <Ellipsis className="size-5" strokeWidth={2.4} />
+      </button>
+    </div>
+  )
+}
+
 function ActiveCard({ startedAt, title }: { startedAt: number; title: string | undefined }) {
   const now = useNow(1000)
   return (
@@ -279,7 +358,15 @@ function ActiveCard({ startedAt, title }: { startedAt: number; title: string | u
   )
 }
 
-function TemplateCard({ template, onClick }: { template: Template; onClick: () => void }) {
+function TemplateCard({
+  template,
+  next,
+  onClick,
+}: {
+  template: Template
+  next: boolean
+  onClick: () => void
+}) {
   const exercises = useLiveQuery(
     () => db.exercises.bulkGet(template.exercises.map((e) => e.exerciseId)),
     [template],
@@ -290,13 +377,27 @@ function TemplateCard({ template, onClick }: { template: Template; onClick: () =
     <button
       type="button"
       onClick={onClick}
+      // Имя кнопки — с названия программы, а не с «2 недели назад».
+      aria-label={[
+        template.name,
+        next ? 'следующая' : template.lastUsedAt ? formatAgo(dateOf(template.lastUsedAt)) : 'новая',
+        names.join(', '),
+      ]
+        .filter(Boolean)
+        .join('. ')}
       className="flex w-[13.5rem] shrink-0 press-scale snap-start flex-col rounded-[var(--radius-card)] bg-surface p-4 text-left shadow-[var(--shadow-card)]"
     >
       <span className="flex items-center justify-between gap-2">
         <MuscleDots muscles={muscles} />
-        <span className="text-caption text-label-2">
-          {template.lastUsedAt ? formatAgo(dateOf(template.lastUsedAt)) : 'новая'}
-        </span>
+        {next ? (
+          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-caption-2 font-semibold text-accent">
+            следующая
+          </span>
+        ) : (
+          <span className="text-caption text-label-2">
+            {template.lastUsedAt ? formatAgo(dateOf(template.lastUsedAt)) : 'новая'}
+          </span>
+        )}
       </span>
       <span className="mt-2.5 line-clamp-1 text-body font-semibold">{template.name}</span>
       <span className="mt-0.5 line-clamp-2 text-footnote text-label-2">
@@ -394,6 +495,66 @@ function BackupBanner({ reminderDays }: { reminderDays: number }) {
 }
 
 /** Подсказка установить на экран «Домой», если открыто в обычном Safari. */
+/**
+ * Первую неделю нового месяца — приглашение посмотреть итоги прошлого.
+ * Скрывается крестиком до следующего месяца.
+ */
+function MonthCard({ workouts, today }: { workouts: Workout[]; today: string }) {
+  const previous = addMonths(startOfMonth(today), -1)
+  const key = previous.slice(0, 7)
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return localStorage.getItem('td:month-card') === key
+    } catch {
+      return false
+    }
+  })
+  const list = workouts.filter((w) => startOfMonth(w.date) === previous)
+  const records = list.reduce((s, w) => s + (w.summary?.records ?? 0), 0)
+  if (hidden || Number(today.slice(8, 10)) > 7 || list.length === 0) return null
+  return (
+    <Section plain>
+      <div className="flex items-center gap-1 rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)]">
+        <Link
+          to={`/progress/month/${key}`}
+          className="flex min-w-0 flex-1 press-scale items-center gap-3 p-4"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--warning)_18%,transparent)] text-warning">
+            <PartyPopper className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-body font-semibold">Итоги {monthGenitive(previous)}</span>
+            <span className="block truncate text-footnote text-label-2">
+              {countLabel(list.length, 'тренировка', 'тренировки', 'тренировок')}
+              {records > 0 && ` · ${countLabel(records, 'рекорд', 'рекорда', 'рекордов')}`}
+            </span>
+          </span>
+          <ChevronRight
+            className="size-[1.125rem] shrink-0 text-label-3"
+            strokeWidth={2.5}
+            aria-hidden
+          />
+        </Link>
+        <button
+          type="button"
+          aria-label="Скрыть"
+          className="mr-2 flex size-8 shrink-0 items-center justify-center text-label-3"
+          onClick={() => {
+            setHidden(true)
+            try {
+              localStorage.setItem('td:month-card', key)
+            } catch {
+              // Без хранилища карточка вернётся при следующем запуске — не беда.
+            }
+          }}
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+    </Section>
+  )
+}
+
 function InstallHint() {
   const [hidden, setHidden] = useState(() => {
     try {

@@ -66,9 +66,23 @@ export function markSummariesDirty(): Promise<void> {
   })
 }
 
-/** При запуске: досчитать то, что не успело пересчитаться в прошлый раз. */
+/**
+ * Версия правил подсчёта итогов. Правила поменялись (как считаются рекорды и т. п.) —
+ * повышаем, и при первом запуске новой версии итоги старых тренировок пересчитаются.
+ */
+export const SUMMARIES_VERSION = 2
+export const SUMMARIES_VERSION_KEY = 'summariesVersion'
+
+/**
+ * При запуске: досчитать то, что не успело пересчитаться в прошлый раз,
+ * и пересчитать всё один раз, если итоги посчитаны по старым правилам.
+ */
 export async function repairSummaries(): Promise<void> {
-  if ((await db.meta.get(SUMMARIES_DIRTY))?.value) await recomputeAllSummaries()
+  const [dirty, version] = await Promise.all([
+    db.meta.get(SUMMARIES_DIRTY),
+    db.meta.get(SUMMARIES_VERSION_KEY),
+  ])
+  if (dirty?.value || version?.value !== SUMMARIES_VERSION) await recomputeAllSummaries()
 }
 
 /** Пересчитывает и сохраняет итоги всех завершённых тренировок. */
@@ -86,5 +100,6 @@ export async function recomputeAllSummaries(): Promise<void> {
       .map((w) => ({ ...w, summary: summaries.get(w.id) }))
     if (changed.length > 0) await db.workouts.bulkPut(changed)
     await db.meta.delete(SUMMARIES_DIRTY)
+    await db.meta.put({ key: SUMMARIES_VERSION_KEY, value: SUMMARIES_VERSION })
   })
 }

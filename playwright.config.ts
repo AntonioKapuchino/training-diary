@@ -13,6 +13,9 @@ export default defineConfig({
     locale: 'ru-RU',
     timezoneId: 'Europe/Moscow',
     trace: 'retain-on-failure',
+    // Без выезда шторок: иначе под нагрузкой WebKit клик иногда приходится на кнопку,
+    // которая ещё едет, и уходит мимо. Приложение уважает эту настройку системы.
+    contextOptions: { reducedMotion: 'reduce' },
   },
   projects: [
     {

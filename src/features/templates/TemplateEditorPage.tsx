@@ -171,7 +171,7 @@ function Editor({ initial }: { initial: Template | undefined }) {
         ) : undefined
       }
     >
-      <div className="px-4 pt-2">
+      <div className="px-5 pt-2">
         <TitleInput value={name} autoFocus={!initial} onChange={rename} onDone={flush} />
         {uses !== undefined && uses > 0 && (
           <p className="mt-1 text-footnote text-label-2">Тренировок по программе: {uses}</p>

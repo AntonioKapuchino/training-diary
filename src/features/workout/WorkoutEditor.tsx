@@ -1,4 +1,13 @@
-import { ArrowDownUp, History, MessageSquareText, Plus, Repeat, Timer, Trash2 } from 'lucide-react'
+import {
+  ArrowDownUp,
+  Flame,
+  History,
+  MessageSquareText,
+  Plus,
+  Repeat,
+  Timer,
+  Trash2,
+} from 'lucide-react'
 import { AnimatePresence } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { updateExercise } from '@/db/exercises'
@@ -6,10 +15,12 @@ import { useEntries, useExerciseMap } from '@/db/hooks'
 import {
   addExercises,
   addSet,
+  addWarmupSets,
   removeEntry,
   removeSet,
   reorderEntries,
   replaceExercise,
+  replaceSets,
   restoreEntry,
   restoreSet,
   toggleSetDone,
@@ -17,12 +28,13 @@ import {
   updateSet,
   type SetPatch,
 } from '@/db/workouts'
-import { formatClock, formatNumber } from '@/domain/format'
+import { countLabel, formatClock, formatNumber, formatWeight } from '@/domain/format'
 import { SET_TYPE_LABEL, SET_TYPES } from '@/domain/labels'
 import { platesFor } from '@/domain/plates'
 import { emptyBests, recordSets } from '@/domain/records'
 import { fieldsFor, isComplete, isWorking, pickValues, type FieldSpec } from '@/domain/sets'
 import type { Exercise, SetField, Workout, WorkoutEntry, WorkoutSet } from '@/domain/types'
+import { warmupPlan } from '@/domain/warmup'
 import { ExercisePicker } from '@/features/exercises/ExercisePicker'
 import { haptic } from '@/lib/haptics'
 import { unlockAudio } from '@/lib/sound'
@@ -277,10 +289,54 @@ export function WorkoutEditor({ workout, mode }: Props) {
     }
   }
 
+  /** Рабочий вес — первого рабочего подхода: набранный, а если пусто — подсказка. */
+  function workingWeight(row: Row): number {
+    const i = row.entry.sets.findIndex((s) => s.type !== 'warmup')
+    if (i < 0) return 0
+    return row.entry.sets[i]?.weight ?? row.fill[i]?.weight ?? row.previous[i]?.weight ?? 0
+  }
+
+  function addWarmup(row: Row) {
+    const working = workingWeight(row)
+    if (working <= 0) {
+      toast('Сначала впиши рабочий вес в первый подход')
+      return
+    }
+    const plan = warmupPlan(working, row.exercise.equipment, settings)
+    if (plan.length === 0) {
+      toast('Вес лёгкий — разминка не нужна')
+      return
+    }
+    const entryId = row.entry.id
+    void addWarmupSets(entryId, plan).then((res) => {
+      if (!res || res.added === 0) {
+        toast('Разминка уже сделана')
+        return
+      }
+      haptic()
+      toast(`Разминка: ${countLabel(res.added, 'подход', 'подхода', 'подходов')}`, {
+        label: 'Отменить',
+        onAction: () => void replaceSets(entryId, res.before),
+      })
+    })
+  }
+
   // ---------- Меню ----------
   const menuRow = entryMenu ? rowOf(entryMenu) : undefined
+  const menuWorking = menuRow ? workingWeight(menuRow) : 0
   const entryActions: Action[] = menuRow
     ? [
+        ...(!past && menuRow.exercise.kind === 'strength'
+          ? [
+              {
+                label: menuWorking > 0 ? `Разминка до ${formatWeight(menuWorking)}` : 'Разминка',
+                icon: <Flame className="size-5" />,
+                onSelect: () => {
+                  addWarmup(menuRow)
+                },
+              },
+            ]
+          : []),
         {
           label: 'Комментарий',
           icon: <MessageSquareText className="size-5" />,
@@ -378,6 +434,16 @@ export function WorkoutEditor({ workout, mode }: Props) {
             }}
             onDeleteSet={(setId) => void deleteSet(row, setId)}
             onAddSet={() => void addSet(row.entry.id)}
+            onWarmup={
+              !past &&
+              row.exercise.kind === 'strength' &&
+              !row.entry.sets.some((x) => x.type === 'warmup') &&
+              workingWeight(row) > 0
+                ? () => {
+                    addWarmup(row)
+                  }
+                : undefined
+            }
             onMenu={() => {
               setEntryMenu(row.entry.id)
             }}
